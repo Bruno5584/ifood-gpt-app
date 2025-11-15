@@ -1755,14 +1755,17 @@ window.__COMPL = {
     console.log('[SAVE MODIFIERS] start', { groupId });
 
     console.log('[SAVE MODIFIERS] delete old', { groupId });
-    const del = await db.from(TABLE_ITEMS)
+    const { data: removedRows, error: delError } = await db.from(TABLE_ITEMS)
       .delete()
       .eq('group_id', groupId)
-      .eq('restaurant_id', restaurantId);
-    if (del.error) throw del.error;
+      .eq('restaurant_id', restaurantId)
+      .select('id');
+    if (delError) throw delError;
+    console.log('[SAVE MODIFIERS] deleted count', { groupId, count: removedRows?.length || 0 });
 
     const rows = Array.from(cardEl.querySelectorAll('.complement-list > div.p-3.bg-surface-2'));
     const payload = [];
+    let filledRows = 0;
 
     rows.forEach((rowEl, idx) => {
       const $name = rowEl.querySelector('input[id^="comp-name-"]');
@@ -1771,6 +1774,7 @@ window.__COMPL = {
 
       const name = ($name?.value || '').trim();
       if (!name) return;
+      filledRows += 1;
 
       payload.push({
         restaurant_id : restaurantId,
@@ -1783,11 +1787,26 @@ window.__COMPL = {
       });
     });
 
+    console.log('[SAVE MODIFIERS] parsed rows', { groupId, totalRows: rows.length, filledRows, payloadCount: payload.length });
+
     if (payload.length) {
       console.log('[SAVE MODIFIERS] insert', { groupId, count: payload.length });
-      const ins = await db.from(TABLE_ITEMS).insert(payload);
-      if (ins.error) throw ins.error;
+      const { data: insertedRows, error: insError } = await db.from(TABLE_ITEMS)
+        .insert(payload)
+        .select('id');
+      if (insError) throw insError;
+      console.log('[SAVE MODIFIERS] inserted count', { groupId, count: insertedRows?.length || 0 });
     }
+  }
+
+  // Helper: sempre prioriza o PRODUCT_ID já conhecido antes de assumir criação
+  function resolveCurrentProductId() {
+    const fromWindow = (window.PRODUCT_ID || '').trim();
+    if (fromWindow) return fromWindow;
+    const fromCtx = window.__EDITOR_CTX__?.PRODUCT_ID ? String(window.__EDITOR_CTX__.PRODUCT_ID).trim() : '';
+    if (fromCtx) return fromCtx;
+    const qs = new URLSearchParams(window.location.search || '');
+    return (qs.get('product_id') || qs.get('id') || qs.get('pid') || '').trim();
   }
 
   // === Salvar tudo (criação x edição) – produto + complementos ===
@@ -1819,18 +1838,11 @@ window.__COMPL = {
         throw new Error('Preencha nome e categoria.');
       }
 
-      // força leitura atualizada da querystring antes de assumir criação
-      if (!PRODUCT_ID) {
-        const qs = new URLSearchParams(window.location.search || '');
-        const pidFromQuery = (qs.get('product_id') || qs.get('id') || qs.get('pid') || '').trim();
-        if (pidFromQuery) {
-          PRODUCT_ID = pidFromQuery;
-        }
-      }
-
-      // se o badge de modo já tiver o PRODUCT_ID, reaproveita
-      if (!PRODUCT_ID && window.__EDITOR_CTX__?.PRODUCT_ID) {
-        PRODUCT_ID = String(window.__EDITOR_CTX__.PRODUCT_ID);
+      // resolve o PRODUCT_ID sempre na ordem: window -> banner -> querystring
+      const resolvedProduct = resolveCurrentProductId();
+      if (resolvedProduct) {
+        PRODUCT_ID = resolvedProduct;
+        window.PRODUCT_ID = resolvedProduct;
       }
 
       if (!PRODUCT_ID) {
