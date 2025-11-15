@@ -1486,19 +1486,40 @@ await (window.__COMPL?.loadGroupsForProduct?.());
   }
 
   // === Carregar grupos+itens na EDIÇÃO ===
-  async function loadGroupsForProduct() {
-    if (!PRODUCT_ID || !RESTAURANT_ID) return;
+  async function loadGroupsForProduct(customDb = db, restaurantId = RESTAURANT_ID, productId = PRODUCT_ID) {
+    if (!customDb) return;
+    if (!restaurantId || !productId) return;
+
+    console.log('[LOAD GROUPS]', { restaurantId, productId });
+
     const box = document.getElementById('category-list-container');
     if (box) box.innerHTML = '';
 
-    const { data: links, error } = await db
+    const { data: links, error } = await customDb
       .from(TABLE_TREE)
       .select(`
-        group_id, min_qty, max_qty, is_required, sort_order,
-        modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
+        group_id,
+        min_qty,
+        max_qty,
+        is_required,
+        sort_order,
+        modifier_groups:${TABLE_GROUPS}!inner (
+          id,
+          title,
+          name,
+          sort_order,
+          modifiers:${TABLE_ITEMS} (
+            id,
+            name,
+            unit_price,
+            description,
+            max_per_item,
+            sort_order
+          )
+        )
       `)
-      .eq(TREE_COLS.restaurant, RESTAURANT_ID)
-      .eq(TREE_COLS.product, PRODUCT_ID)
+      .eq(TREE_COLS.restaurant, restaurantId)
+      .eq(TREE_COLS.product, productId)
       .order(TREE_COLS.sort, { ascending: true });
 
     if (error) {
@@ -1507,31 +1528,22 @@ await (window.__COMPL?.loadGroupsForProduct?.());
     }
 
     for (const link of links || []) {
-      const groupTitle = link.modifier_groups?.title
-        ?? link.modifier_groups?.name
-        ?? '(sem nome)';
+      const groupData = link.modifier_groups || {};
+      const groupTitle = groupData.title ?? groupData.name ?? '(sem nome)';
 
       const { cardEl } = renderGroupCard({
         name: groupTitle,
         min_qty: link.min_qty,
         max_qty: link.max_qty,
-        groupId: link.group_id
+        groupId: link.group_id,
       });
 
       if (!cardEl) continue;
 
-      const { data: items, error: itemsError } = await db
-        .from(TABLE_ITEMS)
-        .select('id,name,unit_price,description,max_per_item,sort_order')
-        .eq('group_id', link.group_id)
-        .order('sort_order', { ascending: true, nullsLast: true });
-
-      if (itemsError) {
-        console.error('[Editor] Falha ao carregar itens do grupo:', itemsError);
-        continue;
-      }
-
-      (items || []).forEach((it) => renderModifierRow(cardEl, it));
+      const modifiers = groupData.modifiers || [];
+      modifiers
+        .sort((a, b) => (a?.sort_order ?? 0) - (b?.sort_order ?? 0))
+        .forEach((it) => renderModifierRow(cardEl, it));
     }
   }
 // expõe para o resto da página
@@ -1544,9 +1556,11 @@ window.__COMPL = {
   // === Salvar categorias (grupos) do produto ===
   async function saveGroupsForProduct() {
     if (!RESTAURANT_ID || !PRODUCT_ID) {
-      alert('Salve o produto antes de criar categorias de complementos.');
-      return [];
+      alert('Salve o produto antes de adicionar complementos.');
+      return;
     }
+
+    console.log('[SAVE GROUPS] start', { RESTAURANT_ID, PRODUCT_ID });
 
     const escapeId = (value) => {
       if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
@@ -1563,8 +1577,6 @@ window.__COMPL = {
     if (delError) throw delError;
 
     const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
-    const upsertPayload = [];
-    const out = [];
 
     for (let i = 0; i < cards.length; i++) {
       const cardEl = cards[i];
@@ -1592,6 +1604,7 @@ window.__COMPL = {
       };
 
       if (groupId) {
+        console.log('[SAVE GROUPS] update group', { groupId, title });
         const { error: updateError } = await db
           .from(TABLE_GROUPS)
           .update(groupRecord)
@@ -1599,6 +1612,7 @@ window.__COMPL = {
           .eq('restaurant_id', RESTAURANT_ID);
         if (updateError) throw updateError;
       } else {
+        console.log('[SAVE GROUPS] insert group', { title });
         const { data: inserted, error: insertError } = await db
           .from(TABLE_GROUPS)
           .insert(groupRecord)
@@ -1613,7 +1627,7 @@ window.__COMPL = {
 
       if (!groupId) continue;
 
-      upsertPayload.push({
+      const linkPayload = {
         restaurant_id: RESTAURANT_ID,
         product_id: PRODUCT_ID,
         group_id: groupId,
@@ -1621,25 +1635,26 @@ window.__COMPL = {
         max_qty: max,
         is_required: min >= 1,
         sort_order: i + 1,
-      });
+      };
 
-      out.push({ groupId, cardEl });
-    }
+      console.log('[SAVE GROUPS] link group', linkPayload);
 
-    if (upsertPayload.length) {
       const { error: upsertError } = await db
         .from(TABLE_TREE)
-        .upsert(upsertPayload, { onConflict: 'product_id,group_id' });
+        .upsert(linkPayload, { onConflict: 'product_id,group_id', ignoreDuplicates: false });
       if (upsertError) throw upsertError;
-    }
 
-    return out;
+      await saveModifiersForGroup(groupId, cardEl);
+    }
   }
 
 
   // === Salvar itens (modifiers) de um grupo ===
   async function saveModifiersForGroup(groupId, cardEl) {
     if (!groupId || !cardEl) return;
+    if (!RESTAURANT_ID) throw new Error('Restaurante não identificado ao salvar complementos.');
+
+    console.log('[SAVE MODIFIERS] start', { groupId });
 
     const del = await db.from(TABLE_ITEMS).delete().eq('group_id', groupId);
     if (del.error) throw del.error;
@@ -1657,7 +1672,7 @@ window.__COMPL = {
       if (!name) return;
 
       payload.push({
-        restaurant_id : RESTAURANT_ID || null,
+        restaurant_id : RESTAURANT_ID,
         group_id      : groupId,
         name,
         unit_price    : maskToNumber($price?.value || '0'),
@@ -1668,6 +1683,7 @@ window.__COMPL = {
     });
 
     if (payload.length) {
+      console.log('[SAVE MODIFIERS] insert', { groupId, count: payload.length });
       const ins = await db.from(TABLE_ITEMS).insert(payload);
       if (ins.error) throw ins.error;
     }
@@ -1728,8 +1744,7 @@ window.__COMPL = {
       if (!PRODUCT_ID) throw new Error('Falha ao criar o produto antes de salvar os complementos.');
 
       // salva categorias e itens
-      const groups = await saveGroupsForProduct();
-      for (const g of groups) await saveModifiersForGroup(g.groupId, g.cardEl);
+      await saveGroupsForProduct();
 
       alert('Produto salvo com complementos.');
     } catch (err) {
