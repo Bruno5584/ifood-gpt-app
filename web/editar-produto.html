@@ -1,0 +1,1850 @@
+<!DOCTYPE html>
+<!-- Design escuro por padrão (sem classe 'dark') -->
+<html lang="pt">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Kimi Sushi - Produto</title>
+
+  <!-- Inter + Material Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons-Outlined" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script>
+    // Paleta e tokens iguais à página do Cardápio
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            'background': '#121212',
+            'surface-1': '#0F0F10',
+            'surface-2': '#1B1B1B',
+            'border': '#2A2A2A',
+            'text-primary': '#FFFFFF',
+            'text-secondary': '#9CA3AF',
+            'placeholder': '#6B7280',
+            'primary': '#E9202A',
+            'primary-hover': '#C71622',
+            'success': '#16A34A',
+            'warning': '#F59E0B',
+            'danger': '#EF4444',
+            'danger-hover': '#DC2626',
+            'success-bg': '#0B2E16',
+            'success-text': '#34D399',
+            'danger-bg': '#2A1212',
+            'danger-text': '#FCA5A5',
+          },
+          fontFamily: { display: ["Inter", "sans-serif"] },
+          borderRadius: { DEFAULT: "0.5rem" },
+          ringColor: { 'primary': '#E9202A55' },
+          borderColor: { DEFAULT: '#2A2A2A' }
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* Scrollbar igual ao projeto do Cardápio */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #121212; }
+    ::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+  </style>
+
+
+<style>
+  /* Hotfix do campo de preço: garante espaço para o prefixo "R$" */
+  #product-price { padding-left: 3.25rem !important; } /* ~52px */
+  #pricePrefix {
+    position: absolute; 
+    left: 0.75rem;            /* 12px */
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #9CA3AF;           /* text-secondary */
+    user-select: none;
+  }
+</style>
+
+
+
+
+<!-- Supabase CDN (precisa vir ANTES do script do editor) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+
+
+</head>
+
+<body class="font-display bg-background text-text-secondary">
+  <div class="flex h-screen">
+
+    <!-- Sidebar (mesma identidade da página do Cardápio) -->
+    <aside class="w-64 bg-surface-2 text-text-primary flex flex-col p-4 border-r border-border">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="bg-primary h-10 w-10 rounded-lg flex items-center justify-center">
+          <span class="text-white text-xl font-bold">K</span>
+        </div>
+        <div>
+          <h1 class="font-bold text-sm text-text-primary">Kimi Sushi</h1>
+          <p class="text-xs text-text-secondary">Restaurante Japonês</p>
+        </div>
+      </div>
+
+      <div class="bg-surface-1 p-3 rounded-lg border border-border mb-6">
+        <div class="flex items-center justify-between text-text-secondary">
+          <div class="flex items-center gap-2">
+            <span class="material-icons-outlined text-xl">watch_later</span>
+            <div>
+              <p class="text-sm font-medium">Loja fechada</p>
+              <p class="text-xs">Fora do horário programado</p>
+            </div>
+          </div>
+          <span class="material-icons-outlined text-lg">chevron_right</span>
+        </div>
+      </div>
+
+      <nav class="flex-grow space-y-2">
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#">
+          <span class="material-icons-outlined">home</span>
+          Início
+        </a>
+        <!-- Mantém o ícone do Cardápio como ativo (vermelho) -->
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium bg-primary/10 text-primary" href="#">
+          <span class="material-icons-outlined">restaurant_menu</span>
+          Cardápio
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#">
+          <span class="material-icons-outlined">receipt_long</span>
+          Pedidos
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#">
+          <span class="material-icons-outlined">trending_up</span>
+          Desempenho
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#">
+          <span class="material-icons-outlined">paid</span>
+          Financeiro
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#">
+          <span class="material-icons-outlined">star_outline</span>
+          Avaliações
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#">
+          <span class="material-icons-outlined">groups</span>
+          Seus clientes
+        </a>
+      </nav>
+
+      <div class="mt-auto pt-4 border-t border-border">
+        <a href="https://www.insightsdelivery.com.br" target="_blank" rel="noopener noreferrer" class="block text-center text-xs text-text-secondary hover:opacity-80 transition-opacity">
+          Desenvolvido por <strong>Insights Delivery</strong>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 overflow-y-auto">
+  <div class="p-8">
+    <!-- GRID PRINCIPAL: 1 coluna no mobile, 3 no desktop -->
+    <div id="editor-grid" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+      <!-- COLUNA ESQUERDA (2/3) -->
+      <div class="lg:col-span-2">
+        <!-- Breadcrumb + Título -->
+        <header class="mb-8">
+          <div class="flex items-center text-sm text-text-secondary mb-2">
+            <a class="hover:underline" href="#">Cardápio</a>
+            <span class="material-icons-outlined text-lg mx-1">chevron_right</span>
+            <a class="hover:underline" href="#">Produtos</a>
+            <span class="material-icons-outlined text-lg mx-1">chevron_right</span>
+            <span id="breadcrumb-last" class="text-text-primary font-medium">Novo produto</span>
+          </div>
+          <h2 id="product-title" class="text-3xl md:text-4xl font-bold text-text-primary mb-2">Novo produto</h2>
+          <p id="product-subtitle" class="text-base md:text-lg text-text-secondary">Defina nome, preço, descrição e categoria.</p>
+        </header>
+
+       <!-- Card: Principais informações -->
+<div class="bg-surface-2 border border-border rounded-lg">
+  <div class="p-6">
+    <h3 class="text-xl font-bold text-text-primary mb-4">Principais informações</h3>
+
+    <!-- grid 2 colunas no md+, com espaçamentos iguais ao original -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+
+      <!-- Nome -->
+<div>
+  <label for="product-name" class="block text-sm font-medium text-text-secondary mb-1">Nome do produto</label>
+  <input
+    id="product-name"
+    type="text"
+    maxlength="80"
+    class="w-full bg-surface-1 border border-border rounded-md py-2 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary placeholder:text-placeholder"
+    placeholder="Nome do produto"
+  />
+  <div class="mt-1 flex items-center justify-between text-xs">
+    <span id="name-error" class="text-danger-text hidden">Máximo de 80 caracteres.</span>
+    <span id="name-counter" class="text-text-secondary">0/80</span>
+  </div>
+</div>
+
+      <!-- Preço -->
+<div>
+  <label for="product-price" class="block text-sm font-medium text-text-secondary mb-1">Preço</label>
+  <div class="relative">
+    <span id="pricePrefix">R$</span>
+    <input
+      id="product-price"
+      type="tel"
+      inputmode="numeric"
+      class="w-full bg-surface-1 border border-border rounded-md py-2 pr-3 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary placeholder:text-placeholder"
+      placeholder="0,00"
+      autocomplete="off"
+      autocorrect="off"
+      spellcheck="false"
+    />
+  </div>
+</div>
+
+
+      <!-- Descrição -->
+<div class="md:col-span-2">
+  <label for="product-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label>
+  <textarea
+    id="product-description"
+    rows="3"
+    maxlength="1000"
+    class="w-full bg-surface-1 border border-border rounded-md py-2 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary placeholder:text-placeholder"
+    placeholder="Descrição do produto"
+  ></textarea>
+  <div class="mt-1 flex items-center justify-between text-xs">
+    <span id="desc-error" class="text-danger-text hidden">Máximo de 1000 caracteres.</span>
+    <span id="desc-counter" class="text-text-secondary">0/1000</span>
+  </div>
+</div>
+
+ <!-- Categoria -->
+<div>
+  <label for="product-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label>
+  <div class="relative">
+    <select
+      id="product-category"
+      class="w-full bg-surface-1 border border-border rounded-md py-2 pl-3 pr-10
+             focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary
+             appearance-none bg-none [background-image:none]"
+    >
+      <option value="" disabled selected hidden>Selecione uma categoria</option>
+    </select>
+    <!-- seta custom -->
+    <span class="material-icons-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none">
+      expand_more
+    </span>
+  </div>
+  <p id="cat-error" class="text-xs text-danger-text mt-1 hidden">Selecione uma categoria.</p>
+</div>
+
+
+
+      <!-- Status de venda (alinhado e sem deslocar nada) -->
+      <div>
+        <label class="block text-sm font-medium text-text-secondary mb-1">Status de venda</label>
+        <div class="flex items-center gap-2">
+          <div id="statusPill" class="flex items-center gap-2 bg-success-bg border border-success-bg/40 rounded-lg p-1.5 flex-grow">
+            <div id="statusDot" class="w-2.5 h-2.5 rounded-full bg-success"></div>
+            <span id="statusText" class="text-sm font-medium text-success-text">Ativo</span>
+          </div>
+
+          <button
+            id="pauseProductBtn"
+            type="button"
+            class="w-10 h-10 flex items-center justify-center rounded-full border border-border text-success hover:bg-surface-1 transition"
+            aria-label="Pausar produto"
+            title="Pausar produto"
+          >
+            <span class="material-icons-outlined">pause</span>
+          </button>
+
+          <button
+            id="deleteProductBtn"
+            type="button"
+            class="w-10 h-10 flex items-center justify-center rounded-full bg-danger text-white hover:bg-danger-hover transition"
+            aria-label="Excluir produto"
+            title="Excluir produto"
+          >
+            <span class="material-icons-outlined">delete</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<!-- FIM Card: Principais informações -->
+
+
+        <!-- Card: Complementos -->
+        <div class="bg-surface-2 border border-border rounded-lg mt-8">
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-xl font-bold text-text-primary">Complementos</h3>
+              <button id="add-category-btn" class="bg-primary text-white font-medium py-2 px-4 rounded-md hover:bg-primary-hover transition flex items-center gap-2 text-sm">
+                <span class="material-icons-outlined text-base">add</span>
+                Adicionar Categoria de Complementos
+              </button>
+            </div>
+
+            <div id="category-list-container" class="space-y-6">
+              <!-- Novas categorias serão inseridas aqui via JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- /COLUNA ESQUERDA -->
+
+      <!-- COLUNA DIREITA (1/3) -->
+<div class="lg:col-span-1">
+  <!-- empurra a coluna no desktop para alinhar com o card da esquerda -->
+  <div class="lg:mt-28">
+    <div class="sticky top-8">
+      <img
+        id="product-cover"
+        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmeixzlqxd4tOjTHQ88-K9IcqNpze01eb8EN1D4UnnyVi_DtSFSS6qSd7Jdiz3DEhBcNxSsZe1n9W-DTYq-5QzuVZLr8yHqA-joJiSkGJKtWH_vm3e4bBo9L3uHwrEnl-f_AfgzG2m_ZcKVPtUQi1Xtj7sCHfySBxsxPD3oqD0Qdz6I-z5RVfbEZgYZgPpbGuMKM-hkmjltxZick6P-sGjxCBSxeF2rfXAJkYvYKr_g3a7aW3-ECNs136a5s9Zdxyt0P4lcuTKWpg"
+        alt="Capa do produto"
+        class="w-full h-auto rounded-lg shadow-lg object-cover bg-surface-1 border border-border"
+      />
+      <div class="mt-4 flex flex-col sm:flex-row justify-end gap-3">
+        <button class="bg-surface-2 border border-border text-text-primary font-medium py-2.5 px-5 rounded-md hover:bg-surface-1 transition">
+          Descartar alterações
+        </button>
+        <button id="saveProductBtn" type="button" class="bg-primary text-white font-medium py-2.5 px-5 rounded-md hover:bg-primary-hover transition">
+  Salvar
+</button>
+
+
+
+</button>
+
+      </div>
+    </div>
+  </div>
+</div>
+      <!-- /COLUNA DIREITA -->
+
+    </div> <!-- /#editor-grid -->
+  </div>
+
+
+<!-- Modal: Confirmar Exclusão -->
+<div id="confirmDeleteModal" class="fixed inset-0 z-[1000] hidden items-center justify-center bg-black/70">
+  <div class="bg-surface-2 border border-border rounded-lg w-[90%] max-w-md p-6">
+    <h3 class="text-lg font-bold text-text-primary mb-2">Confirmar exclusão</h3>
+    <p class="text-text-secondary mb-6">
+      Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.
+    </p>
+    <div class="flex justify-end gap-3">
+      <button id="cancelDeleteBtn"
+        class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition">
+        Cancelar
+      </button>
+      <button id="confirmDeleteBtn"
+        class="bg-danger text-white font-medium py-2 px-4 rounded-md hover:bg-danger-hover transition">
+        Excluir definitivamente
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast simples -->
+<div id="editorToast"
+     class="fixed top-5 left-1/2 -translate-x-1/2 px-4 py-2 rounded-md text-sm font-medium hidden"></div>
+
+
+
+</main>
+
+  </div>
+
+  <!-- Lógica de preenchimento dinâmico (sessionStorage + URL pid) + máscara de preço -->
+  <script>
+    // --- Funções de Máscara de Moeda (Fora do DOMContentLoaded para serem acessíveis dinamicamente) ---
+    /** Formata o input em tempo real (oninput) para moeda */
+    function formatCurrencyInput(input) {
+      // 1. Limpa o valor (mantém apenas dígitos e vírgula/ponto)
+      let value = input.value.replace(/[^\d,.]/g, '');
+      
+      // 2. Garante que só há uma vírgula (substitui o primeiro ponto por vírgula)
+      value = value.replace('.', ',');
+      const parts = value.split(',');
+      if (parts.length > 2) {
+        // Se houver mais de uma vírgula, remove as extras
+        value = parts.shift() + ',' + parts.join('');
+      }
+      
+      // 3. Limita o número de casas decimais a 2
+      if (parts.length === 2 && parts[1].length > 2) {
+        parts[1] = parts[1].substring(0, 2);
+        value = parts.join(',');
+      }
+
+      input.value = value;
+    }
+
+    /** Formata o valor final (onblur) para formato BRL R$ X.XX */
+    function formatCurrencyBlur(input) {
+      // 1. Limpa para o formato de número
+      let value = input.value.replace('R$', '').trim();
+      value = value.replace('.', ''); // remove pontos de milhar (se houver)
+      value = value.replace(',', '.'); // troca vírgula por ponto para JS
+      
+      let number = parseFloat(value);
+
+      if (isNaN(number)) {
+        input.value = '0,00';
+        return;
+      }
+      
+      // 2. Formata para BRL (com duas casas decimais e separador de vírgula)
+      // Remove o símbolo R$ para permitir que o placeholder R$ seja usado no HTML
+      input.value = number.toFixed(2).replace('.', ',');
+    }
+
+
+    // --- Lógica de Status Mínimo da Categoria ---
+    function updateCategoryMinStatus(inputElement) {
+  // Nunca negativo
+  if (inputElement.value < 0) inputElement.value = 0;
+
+  // 1) Pegamos o UID completo após o prefixo "category-min-"
+  //    (em vez de .split('-').pop())
+  const uid = String(inputElement.id).replace(/^category-min-/, '');
+
+  // 2) Contexto do card
+  const categoryCard = inputElement.closest('.bg-surface-1');
+
+  // 3) Seleciona o badge correto
+  //    (usa CSS.escape quando houver; fallback simples quando não houver)
+  const esc = window.CSS && CSS.escape ? CSS.escape : (s)=>s.replace(/[^a-zA-Z0-9_-]/g,'\\$&');
+  const statusElement = categoryCard
+    ? categoryCard.querySelector(`#min-status-${esc(uid)}`)
+    : null;
+
+  const minValue = parseInt(inputElement.value || '0', 10);
+  if (!statusElement) return;
+
+  if (minValue >= 1) {
+    statusElement.textContent = 'Obrigatório';
+    statusElement.className =
+      'ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-danger-bg text-danger-text align-middle';
+  } else {
+    statusElement.textContent = 'Opcional';
+    statusElement.className =
+      'ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-success-bg text-success-text align-middle';
+  }
+}
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+  
+
+      
+      
+      document.addEventListener('input', (e) => {
+        const el = e.target;
+        if (el && el.id && el.id.startsWith('category-min-')) {
+          updateCategoryMinStatus(el);
+        }
+      });
+      
+      
+      
+      
+      
+      // === GUARDA: tenta obter RESTAURANT_ID sem mostrar banner ===
+      (function () {
+        const url = new URL(window.location.href);
+      
+        // 1) querystring
+        let RESTAURANT_ID = (url.searchParams.get('restaurant_id') || '').trim();
+      
+        // 2) sessionStorage (caso tenha vindo do Cardápio)
+        if (!RESTAURANT_ID) {
+          RESTAURANT_ID = (sessionStorage.getItem('RESTAURANT_ID') || '').trim();
+        }
+      
+        // 3) path (UUID no caminho)
+        if (!RESTAURANT_ID) {
+          const guess = url.pathname.split('/').find(s => /^[0-9a-f-]{16,36}$/i.test(s));
+          if (guess) RESTAURANT_ID = guess;
+        }
+      
+        // guarda (sem mostrar banner)
+        window.RESTAURANT_ID = RESTAURANT_ID || '';
+        if (RESTAURANT_ID) sessionStorage.setItem('RESTAURANT_ID', RESTAURANT_ID);
+      
+        console.log('[Editor] RESTAURANT_ID:', RESTAURANT_ID || '(vazio)');
+      })();
+      
+      
+      
+      
+            
+            
+            // ---------- Utils ----------
+            const $ = (sel) => document.querySelector(sel);
+            // ... (outras funções utilitárias) ...
+      
+            // --- Inicializa Status da Categoria Exemplo ---
+            const initialMinInput = document.getElementById('category-min-1');
+            if (initialMinInput) {
+              updateCategoryMinStatus(initialMinInput);
+            }
+      
+      
+            
+      
+           // ---------- Lógica de Preenchimento da Página ----------
+      function applyCreateDefaults(){
+        const h2       = document.getElementById('product-title');
+        const subtitle = document.getElementById('product-subtitle');
+        const $name    = document.getElementById('product-name');
+        const $price   = document.getElementById('product-price');
+        const $desc    = document.getElementById('product-description');
+      
+        if (h2)       h2.textContent = 'Novo produto';
+        if (subtitle) subtitle.textContent = 'Defina nome, preço, descrição e categoria.';
+        if ($name)    $name.value = '';
+        if ($price)   $price.value = '';
+        if ($desc)    $desc.value = '';
+      }
+      
+      // Se NÃO houver product_id na URL, aplica o modo criação (form em branco).
+      (function(){
+        const qs = new URLSearchParams(location.search);
+        const hasProduct = !!qs.get('product_id');
+        if (!hasProduct) applyCreateDefaults();
+      })();
+      
+      
+            // --- Lógica dos Complementos ---
+            const addCategoryBtn = $('#add-category-btn');
+            const categoryListContainer = $('#category-list-container');
+      
+            if (addCategoryBtn && categoryListContainer) {
+              // 1. ADICIONAR NOVA CATEGORIA
+              addCategoryBtn.addEventListener('click', () => {
+                const uniqueId = `cat-${Date.now()}`;
+                const newCategoryHTML = createCategoryHTML(uniqueId);
+                categoryListContainer.insertAdjacentHTML('beforeend', newCategoryHTML);
+                
+                // Foca no input da nova categoria
+                const newCategoryInput = $(`#category-name-${uniqueId}`);
+                if (newCategoryInput) {
+                  newCategoryInput.focus();
+                  newCategoryInput.select();
+                }
+              });
+      
+              // 2. DELEGAÇÃO DE EVENTOS para botões dinâmicos
+              categoryListContainer.addEventListener('click', (e) => {
+                // Encontra o botão clicado (mesmo que o clique seja no ícone span)
+                const targetButton = e.target.closest('button');
+                if (!targetButton) return;
+      
+                // A) DELETAR CATEGORIA
+                if (targetButton.classList.contains('delete-category-btn')) {
+                  // NOTA: Em um app real, usaríamos um modal customizado, não window.confirm()
+                  // if (confirm('Tem certeza que deseja excluir esta categoria e todos os seus complementos?')) {
+                    targetButton.closest('.bg-surface-1').remove();
+                  // }
+                }
+      
+                // D) EDITAR TÍTULO DA CATEGORIA (focar/selecionar input)
+                if (targetButton.classList.contains('edit-category-btn')) {
+                  const categoryCard = targetButton.closest('.bg-surface-1');
+                  if (categoryCard) {
+                    const titleInput = categoryCard.querySelector('input[id^="category-name-"]');
+                    if (titleInput) {
+                      titleInput.focus(); // Foca no input
+                      titleInput.select(); // Seleciona o texto
+                    }
+                  }
+                }
+      
+                // B) ADICIONAR NOVO COMPLEMENTO (DENTRO DA CATEGORIA)
+                if (targetButton.classList.contains('add-complement-btn')) {
+                  const categoryCard = targetButton.closest('.bg-surface-1');
+                  const complementList = categoryCard.querySelector('.complement-list');
+                  // 1. Encontra o placeholder do alerta DENTRO deste card
+                  const alertPlaceholder = categoryCard.querySelector('.category-alert-placeholder');
+                  
+                  // 2. Limpa alertas antigos (se houver)
+                  if (alertPlaceholder) alertPlaceholder.innerHTML = '';
+      
+                  if (complementList) {
+                    // --- REGRA: Não adicionar se o último complemento estiver sem nome ---
+                    const lastComplementRow = complementList.lastElementChild;
+                    if (lastComplementRow) {
+                      // Encontra o input de nome no último complemento
+                      const lastNameInput = lastComplementRow.querySelector('input[id^="comp-name-"]');
+                      
+                      // Se o input existir e estiver vazio, impede a adição
+                      if (lastNameInput && lastNameInput.value.trim() === '') {
+                        console.warn("Preencha o nome do complemento anterior antes de adicionar um novo.");
+                        
+                        // Foca e destaca o input vazio como feedback
+                        lastNameInput.focus();
+                        lastNameInput.classList.add('ring-2', 'ring-danger');
+                        
+                        // 3. MOSTRA o alerta no placeholder
+                        if (alertPlaceholder) {
+                          alertPlaceholder.innerHTML = `
+                            <div class="bg-danger-bg border border-danger text-danger-text text-sm rounded-md p-3 mb-3">
+                              Insira o nome do item para adicionar um novo.
+                            </div>
+                          `;
+                        }
+      
+                        // Remove o destaque e o alerta após 2.5 segundos
+                        setTimeout(() => {
+                          lastNameInput.classList.remove('ring-2', 'ring-danger');
+                          if (alertPlaceholder) alertPlaceholder.innerHTML = ''; // 4. Limpa o alerta
+                        }, 2500); // Aumentei um pouco o tempo
+      
+                        return; // PARA a execução aqui
+                      }
+                    }
+                    // --- FIM DA REGRA ---
+      
+                    // Se passou na regra, cria o novo complemento
+                    const compUniqueId = `comp-${Date.now()}`;
+                    const newComplementHTML = createComplementHTML(compUniqueId);
+                    complementList.insertAdjacentHTML('beforeend', newComplementHTML);
+                    
+                    // Foca no input do novo complemento
+                    const newCompInput = $(`#comp-name-${compUniqueId}`);
+                    if (newCompInput) newCompInput.focus();
+                  }
+                }
+      
+                // C) DELETAR COMPLEMENTO
+                if (targetButton.classList.contains('delete-complement-btn')) {
+                  // Remove a linha (grid) do complemento
+                  targetButton.closest('.p-3.bg-surface-2').remove(); 
+                }
+              });
+            }
+      
+          });
+      
+          // === FUNÇÕES HELPER PARA COMPLEMENTOS ===
+     // BEGIN:RENDER_HELPERS
+function toBRLStringFromNumber(vNum){
+  const cents = Math.round((Number(vNum) || 0) * 100);
+  return (window.__price?.formatFromDigits?.(String(cents))) || '0,00';
+}
+
+function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
+  const uid = `cat-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  const container = document.getElementById('category-list-container');
+  if (!container) return { uid:null, cardEl:null };
+  const html = `
+    <div class="bg-surface-1 border border-border rounded-lg p-4"
+         data-uid="${uid}"
+         ${groupId ? `data-group-id="${groupId}"` : ''}>
+      <div class="flex justify-between items-center mb-4 gap-4">
+        <div class="flex-1">
+          <input id="category-name-${uid}" type="text" value="${(name||'Nova Categoria')}"
+            class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary w-full"/>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
+            <span class="material-icons-outlined">delete</span>
+          </button>
+        </div>
+      </div>
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+        <div class="flex items-end gap-3">
+          <div>
+            <label class="block text-xs text-text-secondary mb-1">Qtd. Mínima</label>
+            <input id="category-min-${uid}" type="number" min="0" value="${Number(min_qty||0)}"
+                   class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
+          </div>
+          <div>
+            <label class="block text-xs text-text-secondary mb-1">Qtd. Máxima</label>
+            <input id="category-max-${uid}" type="number" min="0" value="${Number(max_qty||1)}"
+                   class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
+          </div>
+        </div>
+        <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm add-complement-btn">
+          <span class="material-icons-outlined text-base">add</span>Adicionar Complemento
+        </button>
+      </div>
+      <div class="space-y-3 complement-list"></div>
+    </div>`;
+  container.insertAdjacentHTML('beforeend', html);
+  return { uid, cardEl: container.lastElementChild };
+}
+
+
+function renderModifierRow(cardEl, { name, unit_price, description, max_per_item, sort_order }) {
+  const uniqueId = `comp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  const list = cardEl.querySelector('.complement-list');
+  if (!list) return;
+
+  list.insertAdjacentHTML('beforeend', createComplementHTML(uniqueId));
+
+  const row = list.lastElementChild;
+  row.querySelector(`#comp-name-${uniqueId}`).value  = name || '';
+  row.querySelector(`#comp-price-${uniqueId}`).value = toBRLStringFromNumber(unit_price || 0);
+  row.querySelector(`#comp-qty-${uniqueId}`).value   = Number(max_per_item || 0);
+  row.querySelector(`#comp-desc-${uniqueId}`).value  = description || '';
+}
+
+/** Busca vínculos do produto e seus grupos + itens */
+async function loadGroupsForProduct(db, RESTAURANT_ID, productId){
+  const out = [];
+
+  const { data: links, error: linkErr } = await db
+    .from(TABLE_TREE)
+    .select(`
+      group_id,
+      min_qty,
+      max_qty,
+      is_required,
+      sort_order,
+      modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
+
+    `)
+    .eq(TREE_COLS.restaurant, RESTAURANT_ID)
+    .eq(TREE_COLS.product, productId)
+    .order(TREE_COLS.sort, { ascending: true });
+
+  if (linkErr) throw linkErr;
+  if (!links?.length) return out;
+
+  for (const l of links) {
+    const g = l.modifier_groups || {};
+    const groupTitle = g?.title || '(sem nome)';
+
+    const { cardEl } = renderGroupCard({
+      name: groupTitle,
+      min_qty: l.min_qty,
+      max_qty: l.max_qty
+    });
+
+    const { data: items, error: itemsErr } = await db
+      .from(TABLE_ITEMS)
+      .select('id,name,unit_price,description,max_per_item,sort_order')
+      .eq('group_id', l.group_id)
+      .order('sort_order', { ascending: true, nullsLast: true });
+
+    if (itemsErr) throw itemsErr;
+    (items || []).forEach(it => renderModifierRow(cardEl, it));
+
+    out.push({ groupId: l.group_id, cardEl });
+  }
+
+  return out;
+}
+// END:RENDER_HELPERS
+
+          /**
+           * Cria o HTML para um novo CARD DE CATEGORIA
+           */
+        // START:REPLACE createCategoryHTML
+function createCategoryHTML(uniqueId) {
+  return `
+    <div class="bg-surface-1 border border-border rounded-lg p-4" data-uid="${uniqueId}">
+      <!-- Cabeçalho: título + ações -->
+      <div class="flex justify-between items-center mb-4 gap-4">
+        <div class="flex-1">
+          <label for="category-name-${uniqueId}" class="sr-only">Nome da Categoria</label>
+          <input id="category-name-${uniqueId}" type="text" value="Nova Categoria"
+            class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary placeholder:text-placeholder w-full"/>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="text-text-secondary hover:text-text-primary transition p-1 edit-category-btn" title="Renomear">
+            <span class="material-icons-outlined">edit</span>
+          </button>
+          <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
+            <span class="material-icons-outlined">delete</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Linha compacta: Min / Max + Botão (mesma linha) -->
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+        <!-- Grupo Min/Max compacto -->
+        <div class="flex items-end gap-3">
+          <!-- Min -->
+          <div>
+            <label for="category-min-${uniqueId}" class="block text-xs font-medium text-text-secondary mb-1">
+              Qtd. Mínima
+              <span id="min-status-${uniqueId}" class="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-success-bg text-success-text align-middle">
+                Opcional
+              </span>
+            </label>
+            <input id="category-min-${uniqueId}" type="number" value="0" placeholder="0" min="0"
+              oninput="updateCategoryMinStatus(this)"
+              class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"/>
+          </div>
+
+          <!-- Max -->
+          <div>
+            <label for="category-max-${uniqueId}" class="block text-xs font-medium text-text-secondary mb-1">
+              Qtd. Máxima
+            </label>
+            <input id="category-max-${uniqueId}" type="number" value="1" placeholder="1" min="0"
+              class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"/>
+          </div>
+        </div>
+
+        <!-- Botão Adicionar Complemento -->
+        <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm w-full sm:w-auto add-complement-btn">
+          <span class="material-icons-outlined text-base">add</span>
+          Adicionar Complemento
+        </button>
+      </div>
+
+      <!-- Slot para alertas por categoria -->
+      <div class="category-alert-placeholder"></div>
+
+      <!-- Lista de complementos -->
+      <div class="space-y-3 mb-1 complement-list"><!-- itens entram aqui --></div>
+    </div>
+  `;
+}
+// END:REPLACE createCategoryHTML
+
+      // ================== FIM DA SUBSTITUIÇÃO ==================
+          
+          /**
+           * Cria o HTML para uma nova LINHA DE COMPLEMENTO (com inputs)
+           */
+          function createComplementHTML(uniqueId) {
+            return `
+              <div class="p-3 bg-surface-2 rounded-lg border border-border">
+                <!-- Linha 1: Nome, Preço, Qtd. Máx, Ações -->
+                <div class="grid grid-cols-[5fr_3fr_3fr_1fr] items-center gap-4">
+                  <!-- Nome (Input) -->
+                  <div class="col-span-5">
+                    <label class="sr-only" for="comp-name-${uniqueId}">Nome</label>
+                    <input id="comp-name-${uniqueId}" type="text" placeholder="Nome do Complemento"
+                      class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"/>
+                  </div>
+                  <!-- Preço (Input) -->
+                  <div class="col-span-3">
+                    <label class="sr-only" for="comp-price-${uniqueId}">Preço</label>
+                    <div class="relative">
+                      <span class="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-sm">R$</span>
+                      <input id="comp-price-${uniqueId}" type="text" placeholder="0,00" value="0,00"
+                        class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"
+                        oninput="formatCurrencyInput(this)" onblur="formatCurrencyBlur(this)"/>
+                    </div>
+                  </div>
+                  <!-- Qtd. Máx (Input) -->
+                  <div class="col-span-3">
+                    <label class="sr-only" for="comp-qty-${uniqueId}">Qtd. Máx</label>
+                    <input id="comp-qty-${uniqueId}" type="number" placeholder="Qtd. Máx" value="1" min="0"
+                      class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"/>
+                  </div>
+                  <!-- Ações (Deletar) -->
+                  <div class="col-span-1 flex justify-end">
+                    <button class="text-danger hover:text-danger-hover transition p-1 delete-complement-btn">
+                      <span class="material-icons-outlined">delete</span>
+                    </button>
+                  </div>
+                </div>
+                <!-- Linha 2: Descrição (Textarea) -->
+                <div class="mt-2">
+                  <label class="sr-only" for="comp-desc-${uniqueId}">Descrição</label>
+                  <textarea id="comp-desc-${uniqueId}" rows="1" placeholder="Descrição (opcional)"
+                    class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm resize-none"></textarea>
+                </div>
+              </div>
+            `;
+          }
+        </script>
+
+
+<script>
+// BEGIN:PAUSE_TOGGLE_HANDLER
+/* ===== Pausar/Ativar (Supabase) ===== */
+(function () {
+  const $  = (sel) => document.querySelector(sel);
+  function showToast(msg, type='ok'){
+    const el = $('#editorToast'); if(!el) return;
+    el.textContent = msg;
+    el.className = 'fixed top-5 left-1/2 -translate-x-1/2 px-4 py-2 rounded-md text-sm font-medium';
+    if(type==='ok'){ el.classList.add('bg-success-bg','text-success-text','border','border-success-bg/40'); }
+    if(type==='err'){ el.classList.add('bg-danger-bg','text-danger-text','border','border-danger/40'); }
+    if(type==='warn'){ el.classList.add('bg-yellow-900','text-yellow-200','border','border-yellow-700'); }
+    el.style.display='block';
+    setTimeout(()=>{ el.style.display='none'; }, 2200);
+  }
+  function qp(name){ try{ return new URL(location.href).searchParams.get(name)||''; }catch{ return ''; } }
+
+  const RESTAURANT_ID = window.RESTAURANT_ID || qp('restaurant_id') || sessionStorage.getItem('RESTAURANT_ID') || '';
+  const PRODUCT_ID    = qp('product_id') || '';
+  window.__productActive = true; // default UI
+
+  const pauseBtn   = $('#pauseProductBtn');
+  const statusPill = $('#statusPill');
+  const statusDot  = $('#statusDot');
+  const statusText = $('#statusText');
+
+  if (!window.supabase) { console.error('[Editor] Supabase não carregado.'); return; }
+  const db = window.supabase.createClient(
+    'https://yrmvpocrkjkwhzfpwwmp.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybXZwb2Nya2prd2h6ZnB3d21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2NDUwMjcsImV4cCI6MjA3ODIyMTAyN30.Tz-K3BGUafUlq7pBGbN19l6DTmO5YySyd_c_TIs0JBM'
+  );
+
+  const TABLE_PRODUCTS = 'products';
+
+  function setStatusUI(active){
+    window.__productActive = !!active;
+    const icon = pauseBtn?.querySelector('span');
+    if(active){
+      statusPill?.classList.remove('bg-danger-bg','border-danger-bg/40');
+      statusPill?.classList.add('bg-success-bg','border','border-success-bg/40');
+      statusDot?.classList.remove('bg-danger'); statusDot?.classList.add('bg-success');
+      statusText && (statusText.textContent='Ativo');
+      pauseBtn?.classList.remove('text-danger'); pauseBtn?.classList.add('text-success');
+      icon && (icon.textContent='pause');
+    }else{
+      statusPill?.classList.remove('bg-success-bg','border-success-bg/40');
+      statusPill?.classList.add('bg-danger-bg','border','border-danger-bg/40');
+      statusDot?.classList.remove('bg-success'); statusDot?.classList.add('bg-danger');
+      statusText && (statusText.textContent='Pausado');
+      pauseBtn?.classList.remove('text-success'); pauseBtn?.classList.add('text-danger');
+      icon && (icon.textContent='play_arrow');
+    }
+  }
+
+  async function initStatusFromDB(){
+    if(!PRODUCT_ID || !RESTAURANT_ID) return;
+    const { data, error } = await db.from(TABLE_PRODUCTS)
+      .select('is_active').eq('id', PRODUCT_ID).eq('restaurant_id', RESTAURANT_ID).maybeSingle();
+    if(error){ console.error(error); return; }
+    setStatusUI(!!(data && data.is_active));
+  }
+
+  async function toggleStatus(){
+    if(!PRODUCT_ID){ showToast('Salve o produto antes de pausar.', 'warn'); return; }
+    const wantActive = (statusText?.textContent||'Ativo') !== 'Ativo';
+    setStatusUI(wantActive); // otimista
+    const { error } = await db.from(TABLE_PRODUCTS)
+      .update({ is_active: wantActive }).eq('id', PRODUCT_ID).eq('restaurant_id', RESTAURANT_ID);
+    if(error){
+      setStatusUI(!wantActive);
+      console.error(error); showToast('Falha ao atualizar status.', 'err'); return;
+    }
+    showToast(wantActive ? 'Produto ativado.' : 'Produto pausado.', 'ok');
+  }
+
+  pauseBtn && pauseBtn.addEventListener('click', toggleStatus);
+  initStatusFromDB();
+})();
+/// END:PAUSE_TOGGLE_HANDLER
+
+</script>
+
+
+
+
+
+
+<script>
+  // Badge visual "Modo Criação/Edição" (somente /editar-produto)
+  (function () {
+    if (window.__modeBannerInit) return;
+    window.__modeBannerInit = true;
+
+    function getParam(possibleKeys) {
+      const url = new URL(window.location.href);
+      for (const k of possibleKeys) {
+        const v = url.searchParams.get(k);
+        if (v) return v;
+      }
+      // fallback: /editar-produto/<product_id>
+      const m = location.pathname.match(/editar-produto\/([^/?#]+)/i);
+      return m ? m[1] : '';
+    }
+
+    function init() {
+      const PRODUCT_ID    = getParam(['product_id','id','pid']);
+      const CATEGORY_ID   = getParam(['category_id','cid']);
+      const RESTAURANT_ID = getParam(['restaurant_id','rid']);
+
+      window.__EDITOR_CTX__ = { PRODUCT_ID, CATEGORY_ID, RESTAURANT_ID };
+
+      const mode = PRODUCT_ID ? 'edit' : 'create';
+
+      const badge = document.createElement('div');
+      badge.id = 'editor-mode-badge';
+      badge.style.cssText = [
+        'position:fixed',
+        // afasta do topo para não “esbarrar” na barra do WP/iframe
+        'top:72px',
+        'right:16px',
+        'z-index:99999',
+        'background:#0F172A',
+        'color:#E2E8F0',
+        'border:1px solid #334155',
+        'padding:8px 12px',
+        'border-radius:12px',
+        'font:500 12px/1.2 Inter,system-ui,sans-serif',
+        'box-shadow:0 4px 18px rgba(0,0,0,.35)',
+        'max-width:60vw',
+        'white-space:nowrap',
+        'pointer-events:none'
+      ].join(';');
+
+      const mono = 'style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace"';
+
+      badge.innerHTML = mode === 'edit'
+        ? `✏️ <strong>Edição</strong> • produto <code ${mono}>${PRODUCT_ID}</code>`
+        : `🆕 <strong>Criação</strong> • categoria <code ${mono}>${CATEGORY_ID || '—'}</code>`;
+
+      document.body.appendChild(badge);
+      console.log('[Editor] Modo:', mode === 'edit' ? 'EDIÇÃO' : 'CRIAÇÃO', window.__EDITOR_CTX__);
+    }
+
+    init();
+  })();
+</script>
+
+<script>
+/* ====== Máscara BRL para #product-price ====== */
+(function () {
+  const $price = document.getElementById('product-price');
+  if (!$price) return;
+
+  // Formata a partir de dígitos ("1234" -> "12,34")
+  function formatFromDigits(digits) {
+    digits = String(digits).replace(/\D/g, '');
+    if (!digits) return '';
+    // mínimo 3 dígitos para garantir 0,xx
+    digits = digits.replace(/^0+(?=\d)/, ''); // remove zeros à esquerda
+    if (digits.length === 1) digits = '0' + '0' + digits;      // 1 -> 0,01
+    else if (digits.length === 2) digits = '0' + digits;       // 12 -> 0,12
+
+    const cents = digits.slice(-2);
+    let reais = digits.slice(0, -2);
+
+    // separador de milhar brasileiro
+    reais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    return `${reais},${cents}`;
+  }
+
+  // Lê o input e devolve número JS (ex.: "1.234,56" -> 1234.56)
+  function parseToNumber(v) {
+    if (!v) return 0;
+    const digits = String(v).replace(/\D/g, '');
+    if (!digits) return 0;
+    return Number(digits) / 100;
+  }
+
+  // Guarda helpers global (opcional)
+  window.__priceHelpers = {
+    formatFromDigits,
+    parseToNumber
+  };
+
+  // Estado interno: mantemos só dígitos do usuário
+  let rawDigits = '';
+
+  // Se já existir valor no input (ex. vindo do servidor), reaplica máscara
+  function initFromExisting() {
+    const existing = $price.value;
+    if (!existing) return; // criação: deixa vazio
+    // aceita "28,90" ou "28.90" ou "2890"
+    rawDigits = String(existing).replace(/\D/g, '');
+    $price.value = formatFromDigits(rawDigits);
+  }
+
+  // Formata enquanto digita
+  $price.addEventListener('input', (e) => {
+    // Junta dígitos atuais + o que foi digitado
+    rawDigits = e.target.value.replace(/\D/g, '');
+    $price.value = formatFromDigits(rawDigits);
+  });
+
+  // Cola (paste) -> mantém só dígitos
+  $price.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    rawDigits = String(text).replace(/\D/g, '');
+    $price.value = formatFromDigits(rawDigits);
+  });
+
+  // Blur: se vazio, deixa vazio; se tiver algo, garante 2 casas
+  $price.addEventListener('blur', () => {
+    if (!$price.value) { rawDigits = ''; return; }
+    // já está formatado pelo input; nada a fazer
+  });
+
+  // Focus: posiciona cursor no fim (qualquer navegador)
+  $price.addEventListener('focus', () => {
+    const val = $price.value;
+    $price.value = '';
+    $price.value = val;
+  });
+
+  // Inicializa a partir do que já veio no campo (edição)
+  initFromExisting();
+
+  // Exponha um getter seguro para salvar
+  window.getPriceDecimal = function() {
+    return parseToNumber($price.value); // 1234.56
+  };
+})();
+</script>
+
+
+<script>
+// ===== Máscara BRL (sem digitar vírgula) =====
+(function(){
+  function digitsOnly(s){ return (s||'').replace(/\D+/g,''); }
+  function groupThousands(n){ return n.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+
+  function formatFromDigits(digs){
+    // '0' -> '0,00'; '5' -> '0,05'; '1234' -> '12,34'
+    digs = digitsOnly(digs);
+    if (!digs) return '0,00';
+    if (digs.length === 1) return '0,0' + digs;
+    if (digs.length === 2) return '0,' + digs;
+    const intPart = digs.slice(0, -2);
+    const decPart = digs.slice(-2);
+    return groupThousands(intPart) + ',' + decPart;
+  }
+
+  function toDigitsFromFormatted(v){
+    // '1.234,56' -> '123456'
+    v = String(v||'').trim();
+    if (!v) return '';
+    const clean = v.replace(/\./g,'').replace(',','.');
+    const num = parseFloat(clean);
+    if (isNaN(num)) return '';
+    return String(Math.round(num * 100));
+  }
+
+  function bindPriceMask(input){
+    if (!input) return;
+    // estado interno em data-attr como dígitos (centavos)
+    input.dataset.digits = '';
+
+    input.addEventListener('input', () => {
+      const digs = digitsOnly(input.value);
+      input.dataset.digits = digs;
+      input.value = formatFromDigits(digs);
+    });
+
+    input.addEventListener('focus', () => {
+      // ao focar, reformatar para garantir consistência
+      const digs = input.dataset.digits || digitsOnly(input.value);
+      input.dataset.digits = digs;
+      input.value = formatFromDigits(digs);
+      // move o cursor para o fim
+      setTimeout(()=>{ input.selectionStart = input.selectionEnd = input.value.length; }, 0);
+    });
+
+    input.addEventListener('blur', () => {
+      // normaliza em blur
+      const digs = input.dataset.digits || digitsOnly(input.value);
+      input.dataset.digits = digs;
+      input.value = formatFromDigits(digs);
+    });
+  }
+
+  // expõe helpers para quem carrega produto e para salvar
+  window.__price = {
+    formatFromDigits,
+    toDigitsFromFormatted,
+    bindPriceMask
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const $price = document.getElementById('product-price');
+    bindPriceMask($price);
+  });
+})();
+</script>
+
+
+<script>
+/* ====== Limites e contadores (Nome 80 / Descrição 1000) ====== */
+(function () {
+  const LIMITS = { name: 80, desc: 1000 };
+
+  function updateField($input, limit, $counter, $error) {
+    if (!$input || !$counter || !$error) return;
+    const len = ($input.value || '').length;
+    
+    $counter.textContent = `${len}/${limit}`;
+    
+    // Toggle error visibility
+    if (len > limit) {
+      $error.classList.remove('hidden');
+      $counter.classList.remove('text-text-secondary');
+      $counter.classList.add('text-danger-text');
+    } else {
+      $error.classList.add('hidden');
+      $counter.classList.remove('text-danger-text');
+      $counter.classList.add('text-text-secondary');
+    }
+    // Toggle red border (using Tailwind utility class)
+    $input?.classList.toggle('border-danger', len > limit);
+    $input?.classList.toggle('focus:border-danger', len > limit);
+  }
+
+  function runCounters() {
+    const $name    = document.getElementById('product-name');
+    const $nameCtr = document.getElementById('name-counter');
+    const $nameErr = document.getElementById('name-error');
+    const $desc    = document.getElementById('product-description');
+    const $descCtr = document.getElementById('desc-counter');
+    const $descErr = document.getElementById('desc-error');
+
+    updateField($name, LIMITS.name, $nameCtr, $nameErr);
+    updateField($desc, LIMITS.desc, $descCtr, $descErr);
+  }
+
+  // Exposto para quando os dados vierem do Supabase (edição)
+  window.updateProductFormCounters = function () {
+    // Redefine as referências se os campos tiverem sido carregados dinamicamente (embora não seja o caso aqui)
+    runCounters();
+  };
+
+  // Liga no carregamento inicial e mantém ao digitar
+  document.addEventListener('DOMContentLoaded', () => {
+    const $name    = document.getElementById('product-name');
+    const $desc    = document.getElementById('product-description');
+    
+    runCounters(); // Inicia
+
+    // Mantém ao digitar/colar
+    ['input', 'change'].forEach(evt => {
+        $name && $name.addEventListener(evt, runCounters);
+        $desc && $desc.addEventListener(evt, runCounters);
+    });
+  });
+})();
+</script>
+
+
+
+<script>
+/** ====== SUPABASE + SALVAR/EDITAR PRODUTO (EDITOR) ====== */
+(function(){
+  // 1) CONFIG SUPABASE — use as MESMAS credenciais do Cardápio
+  const SUPABASE_URL = 'https://yrmvpocrkjkwhzfpwwmp.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybXZwb2Nya2prd2h6ZnB3d21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2NDUwMjcsImV4cCI6MjA3ODIyMTAyN30.Tz-K3BGUafUlq7pBGbN19l6DTmO5YySyd_c_TIs0JBM';
+  // BEGIN:TABLES_COMPLEMENTS
+const TABLE_PRODUCTS = 'products';
+const TABLE_GROUPS   = 'modifier_groups';  // grupos/categorias
+const TABLE_ITEMS    = 'modifiers';        // complementos
+const TABLE_TREE     = 'product_groups';   // vínculo produto↔grupo
+
+const TREE_COLS = {
+  id: 'id',
+  restaurant: 'restaurant_id',
+  product: 'product_id',
+  group: 'group_id',
+  min: 'min_qty',
+  max: 'max_qty',
+  required: 'is_required',
+  sort: 'sort_order'
+};
+
+const TABLE_CATEGORIES = 'categories';
+// END:TABLES_COMPLEMENTS
+
+
+  // 2) Helpers
+  function qp(name){
+    const u = new URL(location.href);
+    return u.searchParams.get(name) || '';
+  }
+  function toDecimalBR(v){
+    if(!v) return 0;
+    // aceita "28,90" ou "28.90"
+    return parseFloat(String(v).replace(/\./g,'').replace(',','.')) || 0;
+  }
+  function toBRL(v){ 
+    return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
+  }
+  function goBack(){
+    const u = new URL(location.href);
+    const ret = u.searchParams.get('return_to');
+    if (ret) { window.location.href = ret; return; }
+    if (document.referrer) { history.back(); return; }
+    // fallback (ajuste se quiser uma URL específica do cardápio)
+    window.location.href = '/';
+  }
+  function slugify(t){
+    return String(t||'').toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .replace(/\s+/g,'-').replace(/[^\w\-]+/g,'')
+      .replace(/\-\-+/g,'-').replace(/^-+/, '').replace(/-+$/, '');
+  }
+
+  // 3) Pega contexto via URL (com fallbacks iguais ao restante da página)
+function getFromPath(regex){
+  const m = location.pathname.match(regex);
+  return m ? m[1] : '';
+}
+
+const RESTAURANT_ID =
+  (window.RESTAURANT_ID || '').trim() ||
+  qp('restaurant_id') ||
+  sessionStorage.getItem('RESTAURANT_ID') ||
+  getFromPath(/\/restaurante\/([^\/?#]+)/i) || // se você usar esse padrão em outra rota, ajuste
+  '';
+
+const PRODUCT_ID =
+  qp('product_id') ||
+  getFromPath(/editar-produto\/([^\/?#]+)/i) ||
+  '';
+
+const CATEGORY_ID = qp('category_id') || '';
+
+
+
+  // 4) Inicializa Supabase
+  if (!window.supabase) { console.error('Supabase CDN não carregada.'); return; }
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // 5) Mapeia elementos (garanta os IDs)
+  const $name   = document.getElementById('product-name'); // ID CORRIGIDO
+  const $price  = document.getElementById('product-price'); // ID CORRIGIDO
+  const $desc   = document.getElementById('product-description'); // ID CORRIGIDO
+  const $catSel = document.getElementById('product-category'); // ID CORRIGIDO
+  // NOTE: 'statusToggle', 'imageUrl', 'saveBtn' não existem no HTML atual, usei IDs existentes
+  const $save   = document.querySelector('.flex.flex-col.sm\\:flex-row.justify-end.gap-3 button.bg-primary');
+  // IDs ausentes no HTML (uso de elementos existentes)
+  const $status = document.getElementById('statusToggle'); // não existe, ignorando
+  const $imgUrl = document.getElementById('imageUrl');     // não existe, ignorando
+
+  if (!$name || !$price || !$desc || !$catSel || !$save){
+    console.warn('[Editor] IDs obrigatórios não encontrados. Algumas funcionalidades Supabase serão desativadas.');
+  }
+
+  /* === Carrega categorias do restaurante e prepara seleção === */
+async function loadCategories() {
+  const $catSel = document.getElementById('product-category');
+  const $errCat = document.getElementById('cat-error');
+  if (!$catSel) return;
+
+  // limpa (mantém placeholder)
+  $catSel.innerHTML = '<option value="" disabled selected hidden>Selecione uma categoria</option>';
+
+  // valida RESTAURANT_ID
+  const RESTAURANT_ID = (window.RESTAURANT_ID || new URL(location.href).searchParams.get('restaurant_id') || '').trim();
+  if (!RESTAURANT_ID) {
+    console.warn('[Editor] Sem RESTAURANT_ID para carregar categorias.');
+    return;
+  }
+
+  // busca no Supabase
+  const { data, error } = await window.supabase
+    .createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    .from(TABLE_CATEGORIES)
+    .select('id,name')
+    .eq('restaurant_id', RESTAURANT_ID)
+    .order('sort_order', { ascending: true, nullsLast: true })
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error('[Editor] Falha ao carregar categorias:', error);
+    return;
+  }
+
+  if (!data || !data.length) {
+    // sem categorias — deixa apenas o placeholder
+    return;
+  }
+
+  // injeta opções
+  const opts = data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  $catSel.insertAdjacentHTML('beforeend', opts);
+
+  // pré-seleção:
+  // 1) se vier pela URL (adicionar produto) -> category_id
+  const qs = new URLSearchParams(location.search);
+  const cidFromURL = qs.get('category_id') || '';
+  if (cidFromURL && data.some(c => c.id === cidFromURL)) {
+    $catSel.value = cidFromURL;
+  }
+
+  // feedback de erro ao alterar
+  $catSel.addEventListener('change', () => {
+    if ($errCat) $errCat.classList.add('hidden');
+    $catSel.classList.remove('border-danger');
+  });
+}
+
+ // 7) Se for EDIÇÃO, carrega dados do produto
+// BEGIN:LOAD_GROUPS_IN_EDIT
+async function loadProductIfEdit(){
+  if (!PRODUCT_ID || !RESTAURANT_ID) return;
+
+  try{
+    // === Produto base ===
+    const { data, error } = await db
+      .from(TABLE_PRODUCTS)
+      .select('id,name,description,base_price,is_active,category_id,image_url')
+      .eq('restaurant_id', RESTAURANT_ID)
+      .eq('id', PRODUCT_ID)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return;
+
+    // Campos principais
+    if ($name) $name.value = data.name || '';
+    if ($desc) $desc.value = data.description || '';
+    window.updateProductFormCounters && window.updateProductFormCounters();
+
+    if ($price) {
+      if (data.base_price != null) {
+        const cents = Math.round(Number(data.base_price) * 100);
+        $price.dataset.digits = String(cents);
+        $price.value = window.__price.formatFromDigits(String(cents));
+      } else {
+        $price.dataset.digits = '';
+        $price.value = '';
+      }
+    }
+
+    window.__productActive = !!data.is_active;
+    if ($catSel) $catSel.value = data.category_id || '';
+
+    const h2 = document.getElementById('product-title');
+    const subtitle = document.getElementById('product-subtitle');
+    if (h2 && data.name) h2.textContent = data.name;
+    if (subtitle && data.description) subtitle.textContent = data.description;
+
+    // === Grupos + Complementos do produto ===
+    // Limpa UI anterior (se houver)
+    const listContainer = document.getElementById('category-list-container');
+    if (listContainer) listContainer.innerHTML = '';
+await (window.__COMPL?.loadGroupsForProduct?.());
+
+    
+
+  }catch(err){
+    console.error('[Editor] Falha ao carregar produto/grupos:', err);
+  }
+}
+// END:LOAD_GROUPS_IN_EDIT
+
+
+
+
+
+
+
+
+
+
+  // 9) Boot
+  document.addEventListener('DOMContentLoaded', () => { // CORREÇÃO: Removido 'async'
+    // (não ligue o listener do V1 aqui — o patch V2 já liga o handleSaveClick)
+  
+    // 1) Carrega categorias
+    loadCategories().then(() => { // CORREÇÃO: Usado .then()
+  
+      // 2) Decide: edição x criação (suporta path)
+      const qs  = new URLSearchParams(location.search);
+      const pid = qs.get('product_id') || (location.pathname.match(/editar-produto\/([^\/?#]+)/i)?.[1] || '');
+  
+      if (pid) {
+        loadProductIfEdit().then(() => { // CORREÇÃO: Usado .then()
+          // 3) Atualiza contadores (sempre)
+          window.updateProductFormCounters && window.updateProductFormCounters();
+        });
+      } else {
+         // 3) Atualiza contadores (sempre)
+        window.updateProductFormCounters && window.updateProductFormCounters();
+      }
+    });
+  });
+  
+
+})();
+</script>
+
+<!-- COMPLEMENTS PATCH START -->
+<script>
+/*  =====  Editor de complementos – fluxo correto (async/await)  =====  */
+(function () {
+  // === Supabase (mesmas credenciais do projeto) ===
+  const SUPABASE_URL = window.__ENV?.SUPABASE_URL || 'https://yrmvpocrkjkwhzfpwwmp.supabase.co';
+  const SUPABASE_ANON_KEY = window.__ENV?.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybXZwb2Nya2prd2h6ZnB3d21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2NDUwMjcsImV4cCI6MjA3ODIyMTAyN30.Tz-K3BGUafUlq7pBGbN19l6DTmO5YySyd_c_TIs0JBM';
+  const db = (window.db && window.db.from) ? window.db
+            : (window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null);
+  if (!db) { console.error('[Editor] Supabase não disponível.'); return; }
+
+  // === Contexto (pega por querystring e/ou path) ===
+  function getFromPath(regex){ const m = location.pathname.match(regex); return m ? m[1] : ''; }
+  const qs = new URLSearchParams(location.search);
+  const RESTAURANT_ID = (window.RESTAURANT_ID || qs.get('restaurant_id') || '').trim()
+                      || sessionStorage.getItem('RESTAURANT_ID') || getFromPath(/\/restaurante\/([^\/?#]+)/i) || '';
+  let   PRODUCT_ID    = qs.get('product_id') || getFromPath(/editar-produto\/([^\/?#]+)/i) || '';
+  const CATEGORY_ID   = qs.get('category_id') || '';
+
+  // === Tabelas (seu schema) ===
+  const TABLE_PRODUCTS = 'products';
+  const TABLE_GROUPS   = 'modifier_groups';   // name NOT NULL, product_id NOT NULL
+  const TABLE_ITEMS    = 'modifiers';
+  const TABLE_TREE     = 'product_groups';
+
+  const TREE_COLS = { restaurant:'restaurant_id', product:'product_id', group:'group_id', min:'min_qty', max:'max_qty', required:'is_required', sort:'sort_order' };
+
+  // === Helpers de preço (UI usa máscara própria) ===
+  const maskToNumber = (v) => Number.parseFloat(String(v||'').replace(/\./g,'').replace(',','.')) || 0;
+  const centsToMask  = (num) => {
+    const c = String(Math.round((Number(num)||0)*100)).padStart(3,'0');
+    const int = c.slice(0,-2).replace(/\B(?=(\d{3})+(?!\d))/g,'.') || '0';
+    return `${int},${c.slice(-2)}`;
+  };
+
+  // === Renderização mínima de cards e linhas (reutiliza seu HTML já existente) ===
+  function renderGroupCard({ name, min_qty, max_qty }) {
+    const uid = `cat-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const container = document.getElementById('category-list-container');
+    if (!container) return { uid:null, cardEl:null };
+    const html = `
+      <div class="bg-surface-1 border border-border rounded-lg p-4" data-uid="${uid}">
+        <div class="flex justify-between items-center mb-4 gap-4">
+          <div class="flex-1">
+            <input id="category-name-${uid}" type="text" value="${(name||'Nova Categoria')}"
+              class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary w-full"/>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
+              <span class="material-icons-outlined">delete</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+          <div class="flex items-end gap-3">
+            <div>
+              <label class="block text-xs text-text-secondary mb-1">Qtd. Mínima</label>
+              <input id="category-min-${uid}" type="number" min="0" value="${Number(min_qty||0)}"
+                     class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
+            </div>
+            <div>
+              <label class="block text-xs text-text-secondary mb-1">Qtd. Máxima</label>
+              <input id="category-max-${uid}" type="number" min="0" value="${Number(max_qty||1)}"
+                     class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
+            </div>
+          </div>
+          <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm add-complement-btn">
+            <span class="material-icons-outlined text-base">add</span>Adicionar Complemento
+          </button>
+        </div>
+        <div class="space-y-3 complement-list"></div>
+      </div>`;
+    container.insertAdjacentHTML('beforeend', html);
+    return { uid, cardEl: container.lastElementChild };
+  }
+
+  function renderModifierRow(cardEl, item) {
+    const uid = `comp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const list = cardEl.querySelector('.complement-list'); if (!list) return;
+    list.insertAdjacentHTML('beforeend', `
+      <div class="p-3 bg-surface-2 rounded-lg border border-border">
+        <div class="grid grid-cols-[5fr_3fr_3fr_1fr] items-center gap-4">
+          <div class="col-span-5">
+            <input id="comp-name-${uid}" type="text" placeholder="Nome do Complemento"
+              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"
+              value="${item?.name||''}"/>
+          </div>
+          <div class="col-span-3">
+            <div class="relative">
+              <span class="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-sm">R$</span>
+              <input id="comp-price-${uid}" type="text" placeholder="0,00" value="${centsToMask(item?.unit_price||0)}"
+                class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 text-text-primary text-sm"/>
+            </div>
+          </div>
+          <div class="col-span-3">
+            <input id="comp-qty-${uid}" type="number" min="0" value="${Number(item?.max_per_item||0)}"
+              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"/>
+          </div>
+          <div class="col-span-1 flex justify-end">
+            <button class="text-danger hover:text-danger-hover transition p-1 delete-complement-btn">
+              <span class="material-icons-outlined">delete</span>
+            </button>
+          </div>
+        </div>
+        <div class="mt-2">
+          <textarea id="comp-desc-${uid}" rows="1" placeholder="Descrição (opcional)"
+            class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm resize-none">${item?.description||''}</textarea>
+        </div>
+      </div>
+    `);
+  }
+
+  // === Carregar grupos+itens na EDIÇÃO ===
+  async function loadGroupsForProduct() {
+    if (!PRODUCT_ID || !RESTAURANT_ID) return;
+    const box = document.getElementById('category-list-container'); if (box) box.innerHTML = '';
+
+    const { data: links, error } = await db
+      .from(TABLE_TREE)
+      .select(`
+        group_id, min_qty, max_qty, is_required, sort_order,
+        modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
+      `)
+      .eq(TREE_COLS.restaurant, RESTAURANT_ID)
+      .eq(TREE_COLS.product, PRODUCT_ID)
+      .order(TREE_COLS.sort, { ascending: true });
+
+    if (error) { console.error(error); return; }
+
+    for (const l of (links||[])) {
+      const groupTitle = l.modifier_groups?.title ?? l.modifier_groups?.name ?? '(sem nome)';
+      const { cardEl } = renderGroupCard({
+  name: l.modifier_groups?.title ?? l.modifier_groups?.name ?? '(sem nome)',
+  min_qty: l.min_qty,
+  max_qty: l.max_qty,
+  groupId: l.group_id
+});
+
+      const { data: items } = await db
+        .from(TABLE_ITEMS)
+        .select('id,name,unit_price,description,max_per_item,sort_order')
+        .eq('group_id', l.group_id)
+        .order('sort_order', { ascending: true, nullsLast: true });
+
+      (items||[]).forEach(it => renderModifierRow(cardEl, it));
+    }
+  }
+// expõe para o resto da página
+window.__COMPL = {
+  loadGroupsForProduct,
+  saveGroupsForProduct,
+  saveModifiersForGroup
+};
+
+  // === Salvar categorias (grupos) do produto ===
+  async function saveGroupsForProduct() {
+  if (!RESTAURANT_ID || !PRODUCT_ID) throw new Error('Sem PRODUCT_ID para salvar grupos.');
+
+  // 0) apaga vínculos antigos (mantém os grupos; itens serão limpos por grupo)
+  const del = await db.from(TABLE_TREE)
+    .delete()
+    .eq(TREE_COLS.product, PRODUCT_ID)
+    .eq(TREE_COLS.restaurant, RESTAURANT_ID);
+  if (del.error) throw del.error;
+
+  const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
+  const out = [];
+  const seenGroupIds = new Set(); // evita (product_id,group_id) duplicado
+
+  for (let i = 0; i < cards.length; i++) {
+    const cardEl = cards[i];
+    const uid  = cardEl.getAttribute('data-uid');
+    const $t   = cardEl.querySelector(`#category-name-${CSS.escape(uid)}`);
+    const $min = cardEl.querySelector(`#category-min-${CSS.escape(uid)}`);
+    const $max = cardEl.querySelector(`#category-max-${CSS.escape(uid)}`);
+
+    const title = ($t?.value || '').trim();
+    const min   = parseInt(($min?.value || '0'),10) || 0;
+    const max   = parseInt(($max?.value || '0'),10) || 0;
+
+    if (!title) throw new Error('Informe o nome da categoria.');
+    if (max < min) throw new Error('Na categoria, Máxima deve ser ≥ Mínima.');
+
+    // 1) tenta usar o group_id do próprio card
+    let groupId = cardEl.getAttribute('data-group-id');
+
+    // 2) se não houver, cria novo grupo (NÃO procura por título para evitar colisão)
+    if (!groupId) {
+      const uniqueTitle = title; // pode manter o mesmo nome; id será novo
+      const ins = await db.from(TABLE_GROUPS)
+        .insert({
+          restaurant_id: RESTAURANT_ID,
+          product_id: PRODUCT_ID,
+          title: uniqueTitle,
+          name : uniqueTitle,
+          sort_order: i + 1
+        })
+        .select('id')
+        .single();
+      if (ins.error) throw ins.error;
+      groupId = ins.data.id;
+      // grava no DOM para um eventual re-save na mesma sessão
+      cardEl.setAttribute('data-group-id', groupId);
+    }
+
+    // 3) se por acaso já vimos esse groupId neste mesmo save, forçamos grupo novo
+    if (seenGroupIds.has(groupId)) {
+      const altTitle = `${title} ${Math.random().toString(36).slice(2,5)}`;
+      const ins2 = await db.from(TABLE_GROUPS)
+        .insert({
+          restaurant_id: RESTAURANT_ID,
+          product_id: PRODUCT_ID,
+          title: altTitle,
+          name : altTitle,
+          sort_order: i + 1
+        })
+        .select('id')
+        .single();
+      if (ins2.error) throw ins2.error;
+      groupId = ins2.data.id;
+      cardEl.setAttribute('data-group-id', groupId);
+    }
+
+    // 4) cria vínculo produto↔grupo (agora sem duplicar)
+    const link = await db
+  .from(TABLE_TREE)
+  .upsert({
+    restaurant_id: RESTAURANT_ID,
+    product_id: PRODUCT_ID,
+    group_id: groupId,
+    min_qty: min,
+    max_qty: max,
+    is_required: min >= 1,
+    sort_order: i + 1
+  }, { onConflict: 'product_id,group_id', ignoreDuplicates: true });
+
+    if (link.error) throw link.error;
+
+    seenGroupIds.add(groupId);
+    out.push({ groupId, cardEl });
+  }
+
+  return out;
+}
+
+
+  // === Salvar itens (modifiers) de um grupo ===
+  async function saveModifiersForGroup(groupId, cardEl) {
+    if (!groupId || !cardEl) return;
+
+    const del = await db.from(TABLE_ITEMS).delete().eq('group_id', groupId);
+    if (del.error) throw del.error;
+
+    const rows = Array.from(cardEl.querySelectorAll('.complement-list > div.p-3.bg-surface-2'));
+    const payload = [];
+
+    rows.forEach((rowEl, idx) => {
+      const $name = rowEl.querySelector('input[id^="comp-name-"]');
+      const $price= rowEl.querySelector('input[id^="comp-price-"]');
+      const $desc = rowEl.querySelector('textarea[id^="comp-desc-"]');
+      const $qty  = rowEl.querySelector('input[id^="comp-qty-"]');
+
+      const name = ($name?.value || '').trim();
+      if (!name) return;
+
+      payload.push({
+        restaurant_id : RESTAURANT_ID || null,
+        group_id      : groupId,
+        name,
+        unit_price    : maskToNumber($price?.value || '0'),
+        description   : ($desc?.value || '').trim() || null,
+        max_per_item  : parseInt(($qty?.value || '0'),10) || 0,
+        sort_order    : idx + 1
+      });
+    });
+
+    if (payload.length) {
+      const ins = await db.from(TABLE_ITEMS).insert(payload);
+      if (ins.error) throw ins.error;
+    }
+  }
+
+  // === Salvar tudo (cria produto se for novo) – ***ASSÍNCRONO*** ===
+  async function handleSaveClick(e){
+    e?.preventDefault?.();
+    const btn = document.getElementById('saveProductBtn');
+    if (btn && btn.__saving) return;        // evita duplo clique
+    if (btn) { btn.__saving = true; btn.disabled = true; btn.textContent = 'Salvando...'; }
+
+    try {
+      // cria produto se for novo (mandando SLUG)
+      if (!PRODUCT_ID) {
+        const name  = (document.getElementById('product-name')?.value || '').trim();
+        const desc  = (document.getElementById('product-description')?.value || '').trim();
+        const price = (window.getPriceDecimal ? window.getPriceDecimal() : 0) || 0;
+        const catId = document.getElementById('product-category')?.value || CATEGORY_ID || null;
+        if (!name || !catId) throw new Error('Preencha nome e categoria.');
+
+        const makeSlug = (t) => {
+          const base = (window.slugify ? window.slugify(t) :
+            String(t||'').toLowerCase()
+              .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+              .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')
+              .replace(/-{2,}/g,'-')
+          );
+          return base || 'produto';
+        };
+        let slug = makeSlug(name);
+
+        let insP = await db.from(TABLE_PRODUCTS).insert({
+          restaurant_id: RESTAURANT_ID,
+          category_id  : catId,
+          name, slug,
+          description  : desc || null,
+          base_price   : price,
+          is_active    : true
+        }).select('id').single();
+
+        if (insP.error && insP.error.code === '23505') {
+          slug = `${slug}-${Math.random().toString(36).slice(2,6)}`;
+          insP = await db.from(TABLE_PRODUCTS).insert({
+            restaurant_id: RESTAURANT_ID,
+            category_id  : catId,
+            name, slug,
+            description  : desc || null,
+            base_price   : price,
+            is_active    : true
+          }).select('id').single();
+        }
+
+        if (insP.error) throw insP.error;
+        PRODUCT_ID = insP.data.id;
+      }
+
+      if (!PRODUCT_ID) throw new Error('Falha ao criar o produto antes de salvar os complementos.');
+
+      // salva categorias e itens
+      const groups = await saveGroupsForProduct();
+      for (const g of groups) await saveModifiersForGroup(g.groupId, g.cardEl);
+
+      alert('Produto salvo com complementos.');
+    } catch (err) {
+      console.error('[Editor] Erro ao salvar:', err);
+      alert(err?.message || 'Falha ao salvar complementos.');
+    } finally {
+      if (btn) { btn.__saving = false; btn.disabled = false; btn.textContent = 'Salvar'; }
+    }
+  }
+
+  // === Boot ===
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('saveProductBtn');
+    if (btn && !btn.__bindSave) {
+      btn.addEventListener('click', (ev) => { handleSaveClick(ev); }); // mantém async/await funcionando
+      btn.__bindSave = true;
+    }
+    if (PRODUCT_ID) loadGroupsForProduct();
+  });
+})();
+</script>
+<!-- COMPLEMENTS PATCH END -->
+
+
+
+
+
+
+</body>
+</html>
