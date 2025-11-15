@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<!-- Design escuro por padrão -->
+<html lang="pt">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Kimi Sushi - Cardápio</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            'background': '#121212',
+            'surface-1': '#0F0F10',
+            'surface-2': '#1B1B1B',
+            'border': '#2A2A2A',
+            'text-primary': '#FFFFFF',
+            'text-secondary': '#9CA3AF',
+            'placeholder': '#6B7280',
+            'primary': '#E9202A',
+            'primary-hover': '#C71622',
+            'success': '#16A34A',
+            'warning': '#F59E0B',
+            'danger': '#EF4444',
+            'danger-hover': '#DC2626',
+            'success-bg': '#0B2E16',
+            'success-text': '#34D399',
+            'danger-bg': '#2A1212',
+            'danger-text': '#FCA5A5',
+          },
+          fontFamily: { display: ["Inter", "sans-serif"] },
+          borderRadius: { DEFAULT: "0.5rem" },
+          ringColor: { 'primary': '#E9202A55' },
+          borderColor: { DEFAULT: '#2A2A2A' }
+        },
+      },
+    };
+  </script>
+
+  <!-- ENV Supabase -->
+  <script>
+    (function () {
+      const SUPABASE_URL = 'https://yrmvpocrkjkwhzfpwwmp.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybXZwb2Nya2prd2h6ZnB3d21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2NDUwMjcsImV4cCI6MjA3ODIyMTAyN30.Tz-K3BGUafUlq7pBGbN19l6DTmO5YySyd_c_TIs0JBM';
+      window.__ENV = { SUPABASE_URL, SUPABASE_ANON_KEY };
+    })();
+  </script>
+
+  <!-- Supabase Client -->
+  <script>
+    (function () {
+      try {
+        if (!window.supabase || !window.__ENV) throw new Error('Supabase CDN/ENV não disponíveis.');
+        window.db = window.supabase.createClient(window.__ENV.SUPABASE_URL, window.__ENV.SUPABASE_ANON_KEY);
+        const key = window.__ENV.SUPABASE_ANON_KEY;
+        const maskedKey = `${key.substring(0, 6)}...${key.substring(key.length - 4)}`;
+        console.log(`[Supabase] conectado: ${window.__ENV.SUPABASE_URL} (${maskedKey})`);
+      } catch (e) {
+        console.error('[Supabase] Falha ao inicializar.', e);
+      }
+    })();
+  </script>
+
+  <style>
+    ::-webkit-scrollbar{width:8px}
+    ::-webkit-scrollbar-track{background:#121212}
+    ::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:4px}
+    ::-webkit-scrollbar-thumb:hover{background:#4B5563}
+    .modal{display:none;position:fixed;z-index:1000;inset:0;overflow:auto;background:rgba(0,0,0,.8);justify-content:center;align-items:center}
+    .modal-content{background:#1B1B1B;color:#fff;margin:auto;border-radius:8px;width:90%;box-shadow:0 4px 6px rgba(0,0,0,.1);border:1px solid #2A2A2A}
+    #deleteModal .modal-content, #deleteCategoryModal .modal-content {padding:24px;max-width:400px}
+    #addCategoryModal .modal-content{padding:24px;max-width:512px;border-color:#E9202A;box-shadow:0 0 8px #E9202A,0 0 15px #E9202A,0 4px 6px rgba(0,0,0,.1)}
+    #toastNotification{transition:opacity .3s,transform .3s;position:fixed;top:2rem;left:50%;transform:translate(-50%,-150%);opacity:0;z-index:1001;background:#0B2E16;color:#34D399;padding:.75rem 1.5rem;border-radius:.375rem;box-shadow:0 4px 6px rgba(0,0,0,.1);display:flex;align-items:center}
+    #toastNotification.show{opacity:1;transform:translate(-50%,0)}
+    #reorderListContainer li{background:#0F0F10;border:1px solid #2A2A2A;border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px}
+    #reorderListContainer li:hover{background:#1B1B1B}
+    .drag-handle{cursor:move;color:#9CA3AF}
+    .image-placeholder-icon{width:100%;height:100%;background:#1B1B1B;display:flex;align-items:center;justify-content:center;color:#6B7280;font-size:2.5rem;line-height:1}
+    button:disabled{opacity:.5;cursor:not-allowed}
+  </style>
+</head>
+
+<body class="font-display bg-background text-text-secondary">
+  <div class="flex h-screen">
+    <aside class="w-64 bg-surface-2 text-text-primary flex flex-col p-4 border-r border-border">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="bg-primary h-10 w-10 rounded-lg flex items-center justify-center">
+          <span class="text-white text-xl font-bold">K</span>
+        </div>
+        <div>
+          <h1 class="font-bold text-sm text-text-primary">Kimi Sushi</h1>
+          <p class="text-xs text-text-secondary">Restaurante Japonês</p>
+        </div>
+      </div>
+
+      <div class="bg-surface-1 p-3 rounded-lg border border-border mb-6">
+        <div class="flex items-center justify-between text-text-secondary">
+          <div class="flex items-center gap-2">
+            <span class="material-icons-outlined text-xl">watch_later</span>
+            <div>
+              <p class="text-sm font-medium">Loja fechada</p>
+              <p class="text-xs">Fora do horário programado</p>
+            </div>
+          </div>
+          <span class="material-icons-outlined text-lg">chevron_right</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 mb-6">
+        <button id="toggleStorePauseBtn" class="flex-1 flex items-center justify-center gap-2 bg-danger text-white font-medium py-2.5 px-3 rounded-md hover:bg-danger-hover transition focus:outline-none focus:ring-4 focus:ring-primary/50 text-sm" data-status="active">
+          <span class="material-icons-outlined text-xl icon-pause">pause</span>
+          <span class="btn-text">Pausar</span>
+        </button>
+        <button class="flex-1 flex items-center justify-center gap-2 bg-surface-2 border border-border text-text-primary font-medium py-2.5 px-3 rounded-md hover:bg-surface-1 transition focus:outline-none focus:ring-4 focus:ring-primary/50 text-sm">
+          <span class="material-icons-outlined text-xl">settings</span>
+          <span>Ajustes</span>
+        </button>
+      </div>
+
+      <nav class="flex-grow space-y-2">
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#"><span class="material-icons-outlined">home</span>Início</a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium bg-primary/10 text-primary" href="#"><span class="material-icons-outlined">restaurant_menu</span>Cardápio</a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#"><span class="material-icons-outlined">receipt_long</span>Pedidos</a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#"><span class="material-icons-outlined">trending_up</span>Desempenho</a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#"><span class="material-icons-outlined">paid</span>Financeiro</a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#"><span class="material-icons-outlined">star_outline</span>Avaliações</a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-surface-1 hover:text-text-primary" href="#"><span class="material-icons-outlined">groups</span>Seus clientes</a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:bg-danger-bg hover:text-danger-text transition" href="#"><span class="material-icons-outlined">logout</span>Sair</a>
+      </nav>
+
+      <div class="mt-auto pt-4 border-t border-border">
+        <a href="https://www.insightsdelivery.com.br" target="_blank" rel="noopener noreferrer" class="block text-center text-xs text-text-secondary hover:opacity-80 transition-opacity">
+          Desenvolvido por <strong>Insights Delivery</strong>
+        </a>
+      </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto">
+      <div class="p-8">
+        <header class="mb-6">
+          <div class="flex items-center text-sm text-text-secondary mb-1">
+            <span>Cardápio</span>
+            <span class="material-icons-outlined text-lg mx-1">chevron_right</span>
+            <span class="text-text-primary font-medium">Produtos</span>
+          </div>
+          <h2 class="text-xl font-bold text-text-primary">Gerencie categorias, produtos e complementos aqui.</h2>
+        </header>
+
+        <div class="space-y-4 mb-6">
+          <div class="relative">
+            <span class="material-icons-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">search</span>
+            <input id="searchInput" class="w-full bg-surface-1 border border-border rounded-md py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary placeholder:text-placeholder" placeholder="Buscar um item" type="text"/>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="relative w-full">
+              <select id="categoryFilterSelect" class="w-full appearance-none bg-surface-1 border border-border rounded-md py-2.5 px-4 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary placeholder:text-placeholder">
+                <option value="all">Todas as categorias</option>
+              </select>
+              <span class="material-icons-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none">expand_more</span>
+            </div>
+
+            <button id="openAddCategoryModalBtn" class="flex items-center justify-center gap-2 bg-primary text-white font-medium py-2.5 px-4 rounded-md whitespace-nowrap hover:bg-primary-hover transition focus:outline-none focus:ring-4 focus:ring-primary/50">
+              <span class="material-icons-outlined text-xl">add</span>
+              Adicionar categoria
+            </button>
+
+            <button id="openReorderModalBtn" class="flex items-center justify-center gap-2 bg-surface-2 border border-border text-text-primary font-medium py-2.5 px-4 rounded-md whitespace-nowrap hover:bg-surface-1 transition focus:outline-none focus:ring-4 focus:ring-primary/50">
+              <span class="material-icons-outlined text-xl">swap_vert</span>
+              Reordenar categorias
+            </button>
+          </div>
+        </div>
+
+        <div class="border-b border-border mb-6">
+          <nav class="flex space-x-6 -mb-px">
+            <a id="tab-ativos" class="flex items-center gap-2 py-3 px-1 border-b-2 border-primary text-text-primary font-semibold cursor-pointer" href="#">
+              Ativos
+              <span id="count-ativos" class="bg-success-bg text-success-text text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+            </a>
+            <a id="tab-pausados" class="flex items-center gap-2 py-3 px-1 border-b-2 border-transparent text-text-secondary hover:text-text-primary hover:border-primary/40 cursor-pointer" href="#">
+              Itens Pausados
+              <span id="count-pausados" class="bg-danger-bg text-danger-text text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+            </a>
+          </nav>
+        </div>
+
+        <div class="space-y-8" id="category-list-container">
+          <div id="menu-loader" class="flex flex-col items-center justify-center p-16 space-y-4 text-text-secondary">
+            <svg class="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>A carregar o cardápio...</p>
+          </div>
+
+          <div id="menu-empty-state" class="hidden flex flex-col items-center justify-center p-16 space-y-4 text-center text-text-secondary">
+            <span class="material-icons-outlined text-5xl">restaurant_menu</span>
+            <h3 class="font-bold text-text-primary text-lg">Nenhum item encontrado</h3>
+            <p class="max-w-xs">Parece que ainda não há categorias ou produtos cadastrados no seu cardápio.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toastNotification" class="fixed top-8 left-1/2 -translate-x-1/2 bg-success-bg text-success-text px-6 py-3 rounded-md shadow-lg transition-all transform -translate-y-20 opacity-0 z-[1001]">
+    <span class="material-icons-outlined mr-2 align-middle">check_circle</span>
+    <span id="toast-message" class="font-medium align-middle">Informações salvas.</span>
+  </div>
+
+  <!-- Modais -->
+  <div id="addCategoryModal" class="modal">
+    <div class="modal-content">
+      <h3 class="text-lg font-bold text-text-primary mb-4">Adicionar Nova Categoria</h3>
+      <div class="space-y-4">
+        <label for="newCategoryName" class="block text-sm font-medium text-text-secondary">Nome da Categoria</label>
+        <input type="text" id="newCategoryName" maxlength="40" class="w-full bg-surface-1 border border-border rounded-md py-2.5 px-4 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary placeholder:text-placeholder" placeholder="Ex: Bebidas">
+        <div class="text-right text-xs text-text-secondary" id="charCount">0/40</div>
+      </div>
+      <div class="flex justify-end gap-4 mt-6">
+        <button id="cancelAddCategoryBtn" class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition">Cancelar</button>
+        <button id="saveCategoryBtn" class="bg-primary text-white font-medium py-2 px-4 rounded-md hover:bg-primary-hover transition">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deleteModal" class="modal">
+    <div class="modal-content text-center">
+      <h3 class="text-lg font-bold text-text-primary mb-4">Confirmar Exclusão de Produto</h3>
+      <p class="text-text-secondary mb-6">Tem certeza de que deseja excluir este item? Esta ação não pode ser desfeita.</p>
+      <div class="flex justify-center gap-4">
+        <button id="cancelDeleteBtn" class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition">Cancelar</button>
+        <button id="confirmDeleteBtn" class="bg-danger text-white font-medium py-2 px-4 rounded-md hover:bg-danger-hover transition">Confirmar Exclusão</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Excluir Categoria -->
+  <div id="deleteCategoryModal" class="modal">
+    <div class="modal-content text-center">
+      <h3 class="text-lg font-bold text-text-primary mb-4">Confirmar Exclusão de Categoria</h3>
+      <p class="text-text-secondary mb-6">Tem certeza de que deseja excluir esta categoria? <strong>Todos os produtos nela serão removidos</strong>.</p>
+      <div class="flex justify-center gap-4">
+        <button id="cancelCategoryDeleteBtn" class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition">Cancelar</button>
+        <button id="confirmCategoryDeleteBtn" class="bg-danger text-white font-medium py-2 px-4 rounded-md hover:bg-danger-hover transition">Excluir Categoria e Produtos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reordenar Categorias -->
+  <div id="reorderCategoryModal" class="modal">
+    <div class="modal-content" style="max-width: 600px; padding: 24px;">
+      <h3 class="text-lg font-bold text-text-primary mb-4">Reordenar Categorias</h3>
+      <p class="text-text-secondary mb-6">Arraste e solte as categorias para alterar a ordem em que aparecem no cardápio.</p>
+      <ul id="reorderListContainer" class="space-y-2 max-h-96 overflow-y-auto"></ul>
+      <div class="flex justify-end gap-4 mt-6">
+        <button id="cancelReorderBtn" class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition">Cancelar</button>
+        <button id="saveReorderBtn" class="bg-primary text-white font-medium py-2 px-4 rounded-md hover:bg-primary-hover transition">Concluir</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!window.__menuInit) {
+      window.__menuInit = true;
+
+      const RESTAURANT_ID = 'c15fb33a-36c3-4ab1-9871-a416195e7eb7';
+      const TABLE_CATEGORIES = 'categories';
+      const TABLE_PRODUCTS   = 'products';
+      const TABLE_CART_ITEMS = 'cart_items';
+
+     /* URL do editor (usada no Editar e no Adicionar) */
+const PRODUCT_EDITOR_URL = 'https://www.insightsdelivery.com.br/tela-produto-app/';
+
+      document.addEventListener('DOMContentLoaded', () => {
+        let itemToDelete = null;
+        let categoryToDeleteId = null; 
+        let currentTab = 'ativos';
+
+        const tabAtivos = document.getElementById('tab-ativos');
+        const tabPausados = document.getElementById('tab-pausados');
+        const countAtivosEl = document.getElementById('count-ativos');
+        const countPausadosEl = document.getElementById('count-pausados');
+        const toast = document.getElementById('toastNotification');
+        const toastMessage = document.getElementById('toast-message');
+        let toastTimeout;
+
+        const searchInput = document.getElementById('searchInput');
+        const categoryFilterSelect = document.getElementById('categoryFilterSelect');
+        const categoryListContainer = document.getElementById('category-list-container');
+
+        const menuLoader = document.getElementById('menu-loader');
+        const menuEmptyState = document.getElementById('menu-empty-state');
+
+        const reorderCategoryModal = document.getElementById('reorderCategoryModal');
+        const openReorderModalBtn = document.getElementById('openReorderModalBtn');
+        const cancelReorderBtn = document.getElementById('cancelReorderBtn');
+        const saveReorderBtn = document.getElementById('saveReorderBtn');
+        const reorderListContainer = document.getElementById('reorderListContainer');
+        let sortableInstance = null;
+
+        const addCategoryModal = document.getElementById('addCategoryModal');
+        const openAddCategoryModalBtn = document.getElementById('openAddCategoryModalBtn');
+        const cancelAddCategoryBtn = document.getElementById('cancelAddCategoryBtn');
+        const saveCategoryBtn = document.getElementById('saveCategoryBtn');
+        const newCategoryNameInput = document.getElementById('newCategoryName');
+        const charCount = document.getElementById('charCount');
+
+        const deleteModal = document.getElementById('deleteModal');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        
+        const deleteCategoryModal = document.getElementById('deleteCategoryModal');
+        const confirmCategoryDeleteBtn = document.getElementById('confirmCategoryDeleteBtn');
+        if (confirmCategoryDeleteBtn) confirmCategoryDeleteBtn.addEventListener('click', handleConfirmCategoryDelete);
+
+        const cancelCategoryDeleteBtn = document.getElementById('cancelCategoryDeleteBtn');
+
+        /* ---------- Utils ---------- */
+        function openModal(el){ if (!el) return; el.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+        function closeModal(el){
+          if (!el) return;
+          el.style.display = 'none';
+          const anyOpen = Array.from(document.querySelectorAll('.modal')).some(m => getComputedStyle(m).display === 'flex');
+          if (!anyOpen) document.body.style.overflow = '';
+        }
+        function forceCloseAllModals(){
+          ['addCategoryModal','deleteModal','reorderCategoryModal','deleteCategoryModal'].forEach(id=>{
+            const el = document.getElementById(id); if (el) el.style.display = 'none';
+          });
+          document.body.style.overflow = '';
+        }
+
+        function parseFkTableFromError(err){
+          const msg = (err && (err.message || err.error_description || err.details || '')) + '';
+          const m1 = msg.match(/constraint\s+"?([a-zA-Z0-9_]+product_id_fkey)?"?/i);
+          if (m1 && m1[1]) return m1[1].replace(/_product_id_fkey$/,'');
+          const m2 = msg.match(/table\s+"?([a-zA-Z0-9_]+)"?/i);
+          if (m2 && m2[1]) return m2[1];
+          return null;
+        }
+
+        async function cascadeDeleteProducts(productIds, maxTries = 5){
+          if (!productIds || productIds.length === 0) return;
+          for (let attempt = 1; attempt <= maxTries; attempt++){
+            const del = await window.db.from(TABLE_PRODUCTS).delete().in('id', productIds).eq('restaurant_id', RESTAURANT_ID);
+            if (!del.error) return;
+            const err = del.error;
+            if (err.code !== '23503') throw err;
+            const childTable = parseFkTableFromError(err);
+            if (!childTable) throw err;
+            const childDel = await window.db.from(childTable).delete().in('product_id', productIds);
+            if (childDel.error) throw childDel.error;
+          }
+          throw new Error('Falha ao excluir: dependências persistem após várias tentativas.');
+        }
+
+        function showLoader(show){ if(menuLoader) menuLoader.classList.toggle('hidden', !show); }
+        function showEmptyState(show){ if(menuEmptyState) menuEmptyState.classList.toggle('hidden', !show); }
+
+        function handleSupabaseError(error, ctx){
+          console.error(ctx, error);
+          if (error && error.code === '42501') showToast('Falha de permissão (RLS).', 'error');
+          else showToast(ctx || 'Erro', 'error');
+        }
+
+        function showToast(message, type='success'){
+          if (toastTimeout) clearTimeout(toastTimeout);
+          toastMessage.textContent = message;
+          const icon = toast.querySelector('.material-icons-outlined');
+          toast.classList.remove('bg-success-bg','text-success-text','bg-danger-bg','text-danger-text','bg-yellow-900','text-yellow-300');
+          if(type==='error'){ toast.classList.add('bg-danger-bg','text-danger-text'); if(icon) icon.textContent='error_outline'; }
+          else if(type==='warning'){ toast.classList.add('bg-yellow-900','text-yellow-300'); if(icon) icon.textContent='warning_amber'; }
+          else { toast.classList.add('bg-success-bg','text-success-text'); if(icon) icon.textContent='check_circle'; }
+          toast.classList.add('show'); toastTimeout=setTimeout(()=>toast.classList.remove('show'),3000);
+        }
+
+        function formatPrice(v){ return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0); }
+        function formatPriceForInput(v){ return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:false}).format(v||0); }
+        function handlePriceInput(e){
+          let value = e.target.value.replace(/\D/g,''); if(!value){ e.target.value=''; return; }
+          value=value.padStart(3,'0'); let intPart=value.slice(0,-2).replace(/^0+/,''); if(!intPart) intPart='0';
+          e.target.value = `${intPart},${value.slice(-2)}`;
+        }
+        function getSvgPlaceholder(){ return `<div class="image-placeholder-icon"><span class="material-icons-outlined">image</span></div>`; }
+        function slugify(t){ return t.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,'-').replace(/[^\w\-]+/g,'').replace(/\-\-+/g,'-').replace(/^-+/, '').replace(/-+$/, ''); }
+
+        function updateTabCounters(){
+          const all = categoryListContainer.querySelectorAll('.product-item');
+          const paused = Array.from(all).filter(it => (it.dataset.status==='paused' || it.dataset.status==='false')).length;
+          const total = all.length;
+          if (countAtivosEl) countAtivosEl.textContent = total;
+          if (countPausadosEl) countPausadosEl.textContent = paused;
+        }
+
+        function populateCategoryFilter(){
+          const keep = categoryFilterSelect.value;
+          categoryFilterSelect.querySelectorAll('option:not([value="all"])').forEach(o=>o.remove());
+          categoryListContainer.querySelectorAll('.category-block').forEach(block=>{
+            const opt=document.createElement('option');
+            opt.value = block.id;
+            opt.textContent = block.querySelector('h3')?.textContent || 'Categoria';
+            categoryFilterSelect.appendChild(opt);
+          });
+          categoryFilterSelect.value = [...categoryFilterSelect.options].some(o=>o.value===keep) ? keep : 'all';
+        }
+
+        function updateView(){
+          if (!categoryListContainer || !searchInput || !categoryFilterSelect) return;
+          const searchTerm = searchInput.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+          const selectedCategory = categoryFilterSelect.value;
+          const allCategories = categoryListContainer.querySelectorAll('.category-block');
+
+          allCategories.forEach(category=>{
+            const categoryMatches = (selectedCategory==='all' || category.id===selectedCategory);
+            const products = category.querySelectorAll('.product-item');
+            const hasAnyProduct = products.length > 0;
+            let anyVisible = false;
+
+            products.forEach(product=>{
+              const title=(product.querySelector('h4')?.textContent||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+              const st = product.dataset.status;
+              const isPaused = (st==='paused' || st==='false');
+              const matchesTab = (currentTab==='pausados') ? isPaused : true;
+              const matchesSearch = title.includes(searchTerm);
+
+              if(matchesTab && matchesSearch){ product.classList.remove('hidden'); anyVisible = true; }
+              else { product.classList.add('hidden'); }
+            });
+
+            if (categoryMatches && (currentTab==='pausados' ? anyVisible : (anyVisible || !hasAnyProduct))) {
+              category.classList.remove('hidden');
+            } else {
+              category.classList.add('hidden');
+            }
+          });
+
+          updateTabCounters();
+        }
+
+        function setActiveTabStyles(){
+          const active=['border-primary','text-text-primary','font-semibold'];
+          const inactive=['border-transparent','text-text-secondary','hover:text-text-primary','hover:border-primary/40'];
+          if(currentTab==='ativos'){ tabAtivos.classList.add(...active); tabAtivos.classList.remove(...inactive); tabPausados.classList.add(...inactive); tabPausados.classList.remove(...active); }
+          else { tabPausados.classList.add(...active); tabPausados.classList.remove(...inactive); tabAtivos.classList.add(...inactive); tabAtivos.classList.remove(...active); }
+        }
+
+        function toggleProductPause(productItem, forceState=null){
+          if(!productItem) return;
+          const current=productItem.dataset.status;
+          const newState = forceState ? forceState : (current==='active' ? 'paused' : 'active');
+          productItem.dataset.status=newState;
+
+          const dot=productItem.querySelector('.product-status-dot');
+          const btn=productItem.querySelector('.toggle-product-pause-btn');
+          const icon=btn?.querySelector('.material-icons-outlined');
+          if(!dot||!btn||!icon) return;
+
+          if(newState==='paused'){
+            productItem.classList.add('ring-2','ring-danger');
+            dot.classList.remove('bg-success'); dot.classList.add('bg-danger');
+            btn.classList.remove('text-success'); btn.classList.add('text-danger');
+            icon.textContent='play_arrow';
+          } else {
+            productItem.classList.remove('ring-2','ring-danger');
+            dot.classList.remove('bg-danger'); dot.classList.add('bg-success');
+            btn.classList.remove('text-danger'); btn.classList.add('text-success');
+            icon.textContent='pause';
+          }
+
+          updateTabCounters();
+          updateView();
+        }
+
+        function toggleCategoryPause(categoryBlock, forceState=null){
+          if(!categoryBlock) return;
+          const current=categoryBlock.dataset.status;
+          const newState = forceState ? forceState : (current==='active' ? 'paused':'active');
+          categoryBlock.dataset.status=newState;
+
+          const badge=categoryBlock.querySelector('.category-status-badge');
+          const btn=categoryBlock.querySelector('.toggle-category-pause-btn');
+          const btnText=btn?.querySelector('.btn-text');
+          const btnIcon=btn?.querySelector('.material-icons-outlined');
+          const items=categoryBlock.querySelectorAll('.product-item');
+          if(!badge||!btn||!btnText||!btnIcon) return;
+
+          if(newState==='paused'){
+            badge.textContent='Pausado';
+            badge.classList.remove('bg-success-bg','text-success-text');
+            badge.classList.add('bg-danger-bg','text-danger-text');
+            btn.classList.remove('bg-success','hover:bg-green-700');
+            btn.classList.add('bg-danger','hover:bg-danger-hover','text-white');
+            btnText.textContent='Ativar Categoria';
+            btnIcon.textContent='play_arrow';
+            items.forEach(i=>toggleProductPause(i,'paused'));
+          } else {
+            badge.textContent='Ativo';
+            badge.classList.remove('bg-danger-bg','text-danger-text');
+            badge.classList.add('bg-success-bg','text-success-text');
+            btn.classList.remove('bg-danger','hover:bg-danger-hover');
+            btn.classList.add('bg-success','hover:bg-green-700','text-white');
+            btnText.textContent='Pausar Categoria';
+            btnIcon.textContent='pause';
+            items.forEach(i=>toggleProductPause(i,'active'));
+          }
+        }
+
+        function openDeleteModal(item){ itemToDelete=item; openModal(deleteModal); }
+        function closeDeleteModal(){ itemToDelete=null; closeModal(deleteModal); }
+
+        function openAddCategoryModal(){ 
+          if (!addCategoryModal || !newCategoryNameInput || !charCount) return;
+          newCategoryNameInput.value = '';
+          newCategoryNameInput.classList.remove('border-danger'); 
+          charCount.textContent = '0/40'; 
+          openModal(addCategoryModal); 
+          newCategoryNameInput.focus(); 
+        }
+
+        function closeAddCategoryModal(){ closeModal(addCategoryModal); }
+
+        function openDeleteCategoryModal(categoryId){ categoryToDeleteId = categoryId; openModal(deleteCategoryModal); }
+        function closeDeleteCategoryModal(){ categoryToDeleteId = null; closeModal(deleteCategoryModal); }
+
+        async function handleConfirmCategoryDelete() {
+          if (!categoryToDeleteId) return;
+          const btn = document.getElementById('confirmCategoryDeleteBtn');
+          if (btn) btn.disabled = true;
+
+          try {
+            const { data: prodRows, error: prodErr } = await window.db
+              .from(TABLE_PRODUCTS)
+              .select('id')
+              .eq('category_id', categoryToDeleteId)
+              .eq('restaurant_id', RESTAURANT_ID);
+            if (prodErr) throw prodErr;
+
+            const prodIds = (prodRows || []).map(r => r.id);
+
+            if (prodIds.length > 0) {
+              const delCart = await window.db.from(TABLE_CART_ITEMS).delete().in('product_id', prodIds);
+              if (delCart.error){
+                if (delCart.error.code === '42501'){ throw { code: '42501', message: `Permissão negada pela RLS na tabela ${TABLE_CART_ITEMS}` }; }
+                if (delCart.error.code === '42703'){ throw { code: '42703', message: `Coluna inexistente em ${TABLE_CART_ITEMS}` }; }
+                throw delCart.error;
+              }
+
+              const delProds = await window.db
+                .from(TABLE_PRODUCTS)
+                .delete()
+                .eq('category_id', categoryToDeleteId)
+                .eq('restaurant_id', RESTAURANT_ID);
+              if (delProds.error) throw delProds.error;
+            }
+
+            const { error: catErr, count: catCount } = await window.db
+              .from(TABLE_CATEGORIES)
+              .delete({ count: 'exact' })
+              .eq('id', categoryToDeleteId)
+              .eq('restaurant_id', RESTAURANT_ID)
+              .select('id', { head: true, count: 'exact' });
+            if (catErr) throw catErr;
+
+            if (catCount && catCount > 0) {
+              const block = document.getElementById(`category-${categoryToDeleteId}`);
+              if (block) block.remove();
+              populateCategoryFilter();
+              updateTabCounters();
+              updateView();
+              showToast('Categoria excluída com sucesso.', 'success');
+            } else {
+              showToast('Nenhuma categoria foi apagada. Verifique filtros/RLS.', 'warning');
+            }
+          } catch (error) {
+            if (error && error.code === '23503')      showToast('Não foi possível excluir: há registros dependentes (FK).', 'error');
+            else if (error && error.code === '42501') showToast('Permissão negada pela RLS ao excluir.', 'error');
+            else { console.error('Erro ao excluir categoria:', error); showToast('Erro ao excluir categoria.', 'error'); }
+          } finally {
+            if (btn) btn.disabled = false;
+            forceCloseAllModals();
+            categoryToDeleteId = null;
+          }
+        }
+
+        function openReorderModal(){
+          reorderListContainer.innerHTML='';
+          const blocks = Array.from(categoryListContainer.querySelectorAll('.category-block'))
+            .sort((a,b)=>(parseInt(a.dataset.sortOrder||0)-parseInt(b.dataset.sortOrder||0)));
+          blocks.forEach(block=>{
+            const li=document.createElement('li');
+            const categoryId = (block.id || '').replace('category-','');
+            const categoryName = block.querySelector('h3')?.textContent||'Sem nome';
+            const categorySlug = block.dataset.slug || slugify(categoryName);
+            li.dataset.categoryId = categoryId;
+            li.dataset.categoryName = categoryName; 
+            li.dataset.categorySlug = categorySlug;
+            li.innerHTML = `<span class="material-icons-outlined drag-handle">drag_indicator</span><span class="font-medium text-text-primary">${categoryName}</span>`;
+            reorderListContainer.appendChild(li);
+          });
+          if (sortableInstance) sortableInstance.destroy();
+          sortableInstance=new Sortable(reorderListContainer,{animation:150,handle:'.drag-handle'});
+          openModal(reorderCategoryModal);
+        }
+        function closeReorderModal(){ closeModal(reorderCategoryModal); if(sortableInstance){ sortableInstance.destroy(); sortableInstance=null; } }
+
+        function renderProductItem(product){
+          const status   = product.is_active ? 'active' : 'paused';
+          const isPaused = status==='paused';
+          const ringClass= isPaused ? 'ring-2 ring-danger' : '';
+          const dotClass = isPaused ? 'bg-danger' : 'bg-success';
+          const btnClass = isPaused ? 'text-danger' : 'text-success';
+          const iconName = isPaused ? 'play_arrow' : 'pause';
+
+          const imageHtml = product.image_url
+            ? `<img alt="${product.name||''}" class="w-16 h-16 rounded-md object-cover" src="${product.image_url}" onerror="this.onerror=null; this.replaceWith(document.createElement('div').innerHTML='${getSvgPlaceholder().replace(/'/g,"\\'")}')" />`
+            : `<div class="w-16 h-16 rounded-md overflow-hidden">${getSvgPlaceholder()}</div>`;
+
+          return `
+            <div class="product-item p-4 flex items-center gap-4 ${ringClass}" data-status="${status}" data-product-id="${product.id}" data-sort-order="${product.sort_order||0}">
+              <div class="w-16 h-16 shrink-0">${imageHtml}</div>
+              <div class="flex-grow">
+                <h4 class="font-semibold text-text-primary">${product.name||'Item sem nome'}</h4>
+                <p class="text-sm text-text-secondary">${product.description||''}</p>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="price-container">
+                  <span class="price-display font-semibold text-text-primary whitespace-nowrap cursor-pointer p-1 rounded-md hover:bg-surface-1">${formatPrice(product.base_price)}</span>
+                  <input type="tel" class="price-input hidden w-24 bg-surface-1 border border-primary text-text-primary rounded-md p-1 text-center" data-price-decimal="${product.base_price||0}"/>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="product-status-dot w-2.5 h-2.5 rounded-full ${dotClass}"></div>
+
+                  <button class="toggle-product-pause-btn w-10 h-10 flex items-center justify-center rounded-full border border-border ${btnClass} hover:bg-surface-1 transition">
+                    <span class="material-icons-outlined">${iconName}</span>
+                  </button>
+
+                  <!-- Editar → abre editor -->
+                  <button class="edit-product-btn w-10 h-10 flex items-center justify-center rounded-full border border-border text-text-primary hover:bg-surface-1 transition">
+                    <span class="material-icons-outlined">edit</span>
+                  </button>
+
+                  <button class="delete-product-btn w-10 h-10 flex items-center justify-center rounded-full bg-danger text-white hover:bg-danger-hover transition ml-2">
+                    <span class="material-icons-outlined">delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>`;
+        }
+
+        function renderCategoryBlock(category, products){
+          const allPaused = products.length>0 && products.every(p=>!p.is_active);
+          const status = allPaused ? 'paused' : 'active';
+          const badgeClass = allPaused ? 'bg-danger-bg text-danger-text' : 'bg-success-bg text-success-text';
+          const badgeText  = allPaused ? 'Pausado' : 'Ativo';
+          const btnText    = allPaused ? 'Ativar Categoria' : 'Pausar Categoria';
+          const btnIcon    = allPaused ? 'play_arrow' : 'pause';
+          const btnColorClass = allPaused ? 'bg-danger text-white hover:bg-danger-hover' : 'bg-success text-white hover:bg-green-700';
+
+          const productsHtml = products.length
+            ? products.map(renderProductItem).join('')
+            : `<div class="p-6 text-sm text-text-secondary empty-category" data-empty="true">
+                 Nenhum produto nesta categoria. Clique em <strong>"Adicionar produto"</strong>.
+               </div>`;
+
+          return `
+            <div id="category-${category.id}" class="category-block bg-surface-2 border border-border rounded-lg" 
+                 data-status="${status}" 
+                 data-sort-order="${category.sort_order||0}"
+                 data-slug="${category.slug||''}">
+              <div class="p-4 flex items-center justify-between border-b border-border">
+                <div class="flex items-center gap-3">
+                  <h3 class="text-xl font-bold text-text-primary">${category.name||'Categoria sem nome'}</h3>
+                  <span class="category-status-badge ${badgeClass} text-xs font-semibold px-2.5 py-1 rounded-full">${badgeText}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <button class="add-product-btn flex items-center gap-2 bg-primary text-white font-medium py-2 px-4 rounded-md text-sm hover:bg-primary-hover transition focus:outline-none focus:ring-4 focus:ring-primary/50" data-category-id="${category.id}">
+                    <span class="material-icons-outlined text-lg">add</span>Adicionar produto
+                  </button>
+
+                  <button class="toggle-category-pause-btn flex items-center gap-2 ${btnColorClass} font-medium py-2 px-4 rounded-md text-sm transition focus:outline-none focus:ring-4 focus:ring-primary/50" data-category-id="${category.id}">
+                    <span class="material-icons-outlined text-lg">${btnIcon}</span><span class="btn-text">${btnText}</span>
+                  </button>
+
+                  <button class="delete-category-btn w-10 h-10 flex items-center justify-center rounded-full bg-danger text-white hover:bg-danger-hover transition" data-category-id="${category.id}">
+                    <span class="material-icons-outlined">delete</span>
+                  </button>
+                </div>
+              </div>
+              <div class="divide-y divide-border">${productsHtml}</div>
+            </div>`;
+        }
+
+        async function loadMenu(){
+          if(!window.db){ showToast('Erro de conexão.', 'error'); return; }
+          showLoader(true); showEmptyState(false);
+          categoryListContainer.innerHTML=''; categoryListContainer.appendChild(menuLoader); categoryListContainer.appendChild(menuEmptyState);
+
+          try{
+            const { data: catData, error: catError } = await window.db
+              .from(TABLE_CATEGORIES)
+              .select('id,name,sort_order,slug')
+              .eq('restaurant_id', RESTAURANT_ID)
+              .order('sort_order',{ascending:true,nullsLast:true})
+              .order('name',{ascending:true});
+            if(catError) throw catError;
+            if(!catData || catData.length===0){ showEmptyState(true); return; }
+
+            const productPromises = catData.map(c =>
+              window.db.from(TABLE_PRODUCTS)
+                .select('id,category_id,name,description,base_price,is_active,image_url,sort_order')
+                .eq('restaurant_id', RESTAURANT_ID)
+                .eq('category_id', c.id)
+                .order('sort_order',{ascending:true,nullsLast:true})
+                .order('name',{ascending:true})
+            );
+
+            const results = await Promise.all(productPromises);
+            let html = '';
+            for(let i=0;i<catData.length;i++){
+              const prods = results[i].error ? [] : results[i].data;
+              html += renderCategoryBlock(catData[i], prods);
+            }
+            categoryListContainer.innerHTML = html;
+
+            populateCategoryFilter();
+            updateTabCounters();
+            setActiveTabStyles();
+            updateView();
+          }catch(err){
+            handleSupabaseError(err,'Não foi possível carregar o cardápio');
+            categoryListContainer.innerHTML=''; showEmptyState(true);
+          }finally{ showLoader(false); }
+        }
+
+        /* -------- Eventos principais (Delegação) -------- */
+        document.body.addEventListener('click', async (e)=>{
+          const target=e.target;
+
+          // Pausar/Ativar Categoria
+          if(target.closest('.toggle-category-pause-btn')){
+            const btn = target.closest('.toggle-category-pause-btn');
+            const categoryId = btn.dataset.categoryId;
+            const categoryBlock = document.getElementById(`category-${categoryId}`);
+            if(!categoryBlock) return;
+
+            const isActive = categoryBlock.dataset.status==='active';
+            const newStatus = isActive ? 'paused' : 'active';
+            const newIsActive = !isActive;
+
+            toggleCategoryPause(categoryBlock, newStatus);
+
+            const { error } = await window.db.from(TABLE_PRODUCTS)
+              .update({ is_active: newIsActive })
+              .eq('category_id', categoryId)
+              .eq('restaurant_id', RESTAURANT_ID);
+
+            if(error){ handleSupabaseError(error,'Erro ao atualizar categoria'); toggleCategoryPause(categoryBlock, isActive?'active':'paused'); }
+            else showToast(newIsActive?'Categoria ativada.':'Categoria pausada.','success');
+            return;
+          }
+
+          // Pausar/Ativar Produto
+          if(target.closest('.toggle-product-pause-btn')){
+            e.stopPropagation();
+            const item=target.closest('.product-item'); if(!item) return;
+            const productId=item.dataset.productId;
+            const isActive=item.dataset.status==='active';
+            const newIsActive=!isActive;
+
+            toggleProductPause(item);
+
+            const { error } = await window.db.from(TABLE_PRODUCTS)
+              .update({ is_active: newIsActive })
+              .eq('id', productId)
+              .eq('restaurant_id', RESTAURANT_ID);
+
+            if(error){ handleSupabaseError(error,'Erro ao atualizar item'); toggleProductPause(item); }
+            return;
+          }
+
+        // Editar Produto (abrir editor na MESMA aba)
+if (target.closest('.edit-product-btn')) {
+  e.stopPropagation();
+
+  const item = target.closest('.product-item');
+  if (!item) return;
+
+  const productId = item.dataset.productId;
+
+  // tenta capturar dados da categoria a partir do bloco pai
+  const categoryBlock = item.closest('.category-block');
+  const categoryId   = categoryBlock ? categoryBlock.id.replace('category-','') : '';
+  const categorySlug = categoryBlock ? (categoryBlock.dataset.slug || '') : '';
+
+  const url = `${PRODUCT_EDITOR_URL}`
+    + `?restaurant_id=${encodeURIComponent(RESTAURANT_ID)}`
+    + `&product_id=${encodeURIComponent(productId)}`
+    + `&category_id=${encodeURIComponent(categoryId)}`
+    + `&category_slug=${encodeURIComponent(categorySlug)}`;
+
+  // abre na MESMA aba
+  window.location.href = url;
+  return;
+}
+
+
+
+          // Excluir Produto (Abrir Modal)
+          if(target.closest('.delete-product-btn')){
+            e.stopPropagation();
+            const item=target.closest('.product-item'); if(item) openDeleteModal(item);
+            return;
+          }
+
+          // Excluir Categoria (Abrir Modal)
+          if(target.closest('.delete-category-btn')){
+            const btn = target.closest('.delete-category-btn');
+            const categoryId = btn.dataset.categoryId;
+            openDeleteCategoryModal(categoryId);
+            return;
+          }
+
+          // Editar preço (mostrar input)
+          if(target.closest('.price-display')){
+            const display=target.closest('.price-display');
+            const container=display.closest('.price-container');
+            const input=container.querySelector('.price-input');
+            input.value = formatPriceForInput(parseFloat(input.dataset.priceDecimal)||0);
+            display.classList.add('hidden'); input.classList.remove('hidden'); input.focus(); input.select();
+            return;
+          }
+
+          // Adicionar Produto (mesma aba, sem criar no banco aqui)
+if (target.closest('.add-product-btn')) {
+  const btn = target.closest('.add-product-btn');
+  const categoryId = btn.dataset.categoryId;
+
+  // pega o slug da categoria no DOM (foi adicionado em data-slug no bloco da categoria)
+  const block = document.getElementById(`category-${categoryId}`);
+  if (!block) return;
+
+  const categorySlug = block.dataset.slug || '';
+
+  // monta a URL do editor com os parâmetros necessários
+  const url = `${PRODUCT_EDITOR_URL}?restaurant_id=${encodeURIComponent(RESTAURANT_ID)}&category_id=${encodeURIComponent(categoryId)}&category_slug=${encodeURIComponent(categorySlug)}`;
+
+  // abre na MESMA aba
+  window.location.href = url;
+  return;
+}
+
+        });
+
+        // Inputs
+        document.body.addEventListener('input',(e)=>{
+          if(e.target.classList.contains('price-input')) handlePriceInput(e);
+          if(e.target.id==='newCategoryName'){
+            charCount.textContent = `${newCategoryNameInput.value.length}/40`;
+            if(newCategoryNameInput.value.length>0) newCategoryNameInput.classList.remove('border-danger');
+          }
+        });
+
+        // Salvar preço
+        document.body.addEventListener('focusout', async (e)=>{
+          if(e.target.classList.contains('price-input')){
+            const input=e.target;
+            const container=input.closest('.price-container');
+            const display=container.querySelector('.price-display');
+            const productItem=input.closest('.product-item');
+            const productId=productItem.dataset.productId;
+
+            let v=input.value; if(!v) v="0,00";
+            const newDecimal = parseFloat(v.replace(/\./g,'').replace(',','.'))||0;
+            const oldDecimal = parseFloat(input.dataset.priceDecimal)||0;
+
+            if(newDecimal===oldDecimal){ input.classList.add('hidden'); display.classList.remove('hidden'); return; }
+
+            display.textContent=formatPrice(newDecimal);
+            input.dataset.priceDecimal=newDecimal;
+            input.classList.add('hidden'); display.classList.remove('hidden');
+
+            const { error } = await window.db.from(TABLE_PRODUCTS)
+              .update({ base_price:newDecimal })
+              .eq('id', productId)
+              .eq('restaurant_id', RESTAURANT_ID);
+
+            if(error){ handleSupabaseError(error,'Erro ao salvar preço'); display.textContent=formatPrice(oldDecimal); input.dataset.priceDecimal=oldDecimal; }
+            else showToast('Preço salvo.','success');
+          }
+        });
+
+        document.body.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && e.target.classList.contains('price-input')) e.target.blur(); });
+
+        // Modais — abrir/fechar
+        if(openAddCategoryModalBtn) openAddCategoryModalBtn.addEventListener('click', openAddCategoryModal);
+        if(openReorderModalBtn)     openReorderModalBtn.addEventListener('click', openReorderModal);
+        if(cancelDeleteBtn)         cancelDeleteBtn.addEventListener('click', ()=>closeModal(deleteModal));
+        if(cancelAddCategoryBtn)    cancelAddCategoryBtn.addEventListener('click', ()=>closeModal(addCategoryModal));
+        if(cancelReorderBtn)        cancelReorderBtn.addEventListener('click', ()=>closeModal(reorderCategoryModal));
+        if(cancelCategoryDeleteBtn) cancelCategoryDeleteBtn.addEventListener('click', closeDeleteCategoryModal);
+
+        window.addEventListener('click',(ev)=>{
+          if (ev.target === deleteModal) closeModal(deleteModal);
+          if (ev.target === addCategoryModal) closeModal(addCategoryModal);
+          if (ev.target === reorderCategoryModal) closeModal(reorderCategoryModal);
+          if (ev.target === deleteCategoryModal) closeDeleteCategoryModal();
+        });
+
+        // ESC fecha qualquer modal
+        document.addEventListener('keydown', (ev)=>{ if (ev.key === 'Escape') forceCloseAllModals(); });
+
+        // Salvar Reordenação
+        if (saveReorderBtn) saveReorderBtn.addEventListener('click', async () => {
+          const btn = document.getElementById('saveReorderBtn');
+          const originalText = btn.textContent;
+          btn.disabled = true;
+
+          try {
+            const lis = Array.from(reorderListContainer.children);
+            if (!lis.length) { closeModal(reorderCategoryModal); return; }
+
+            const updates = lis.map((li, idx) => ({
+              id: li.dataset.categoryId,
+              name: li.dataset.categoryName,
+              slug: li.dataset.categorySlug,
+              sort_order: idx + 1,
+              restaurant_id: RESTAURANT_ID
+            }));
+
+            const { error } = await window.db.from(TABLE_CATEGORIES).upsert(updates, { onConflict: 'id' });
+            if (error) throw error;
+
+            showToast('Ordem das categorias salva.', 'success');
+            closeReorderModal();
+            await loadMenu();
+          } catch (err) {
+            btn.textContent = originalText;
+            handleSupabaseError(err, 'Erro ao salvar a nova ordem');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+
+        // Confirmar exclusão de produto
+        if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', async () => {
+          if (!itemToDelete) return;
+          const productId = itemToDelete.dataset.productId;
+          confirmDeleteBtn.disabled = true;
+
+          try {
+            await cascadeDeleteProducts([productId]);
+            itemToDelete.remove();
+            updateTabCounters();
+            updateView();
+            showToast('Item excluído.', 'success');
+          } catch (err) {
+            if (err && err.code === '23503')      showToast('Não foi possível excluir: há registros dependentes (FK).', 'error');
+            else if (err && err.code === '42501') showToast('Permissão negada pela RLS ao excluir dependências.', 'error');
+            else                                   handleSupabaseError(err, 'Erro ao excluir item');
+          } finally {
+            confirmDeleteBtn.disabled = false;
+            closeModal(deleteModal);
+          }
+        });
+
+        // Filtros/Abas
+        if(categoryFilterSelect) categoryFilterSelect.addEventListener('change', updateView);
+        if(searchInput)         searchInput.addEventListener('input', updateView);
+        if(tabAtivos)   tabAtivos.addEventListener('click', (e)=>{ e.preventDefault(); currentTab='ativos'; setActiveTabStyles(); updateView(); });
+        if(tabPausados) tabPausados.addEventListener('click', (e)=>{ e.preventDefault(); currentTab='pausados'; setActiveTabStyles(); updateView(); });
+
+        // Botão Pausar Loja (visual)
+        const toggleStorePauseBtn=document.getElementById('toggleStorePauseBtn');
+        if(toggleStorePauseBtn){
+          toggleStorePauseBtn.addEventListener('click', ()=>{
+            showToast("Função 'Pausar Loja' não implementada.", 'warning');
+            const btn=toggleStorePauseBtn, text=btn.querySelector('.btn-text'), icon=btn.querySelector('.icon-pause');
+            const st=btn.dataset.status;
+            if(st==='active'){
+              btn.dataset.status='paused';
+              btn.classList.remove('bg-danger','hover:bg-danger-hover'); btn.classList.add('bg-success','hover:bg-green-700');
+              text.textContent='Ativar'; icon.textContent='play_arrow';
+            } else {
+              btn.dataset.status='active';
+              btn.classList.remove('bg-success','hover:bg-green-700'); btn.classList.add('bg-danger','hover:bg-danger-hover');
+              text.textContent='Pausar'; icon.textContent='pause';
+            }
+          });
+        }
+
+        loadMenu();
+      });
+    }
+  </script>
+
+<script>
+  // Evita rodar duas vezes
+  if (!window.__editorInit) {
+    window.__editorInit = true;
+
+    // === Ajuste estes dois se o editor usar outro projeto Supabase ===
+    const SUPABASE_URL = 'https://yrmvpocrkjkwhzfpwwmp.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybXZwb2Nya2prd2h6ZnB3d21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2NDUwMjcsImV4cCI6MjA3ODIyMTAyN30.Tz-K3BGUafUlq7pBGbN19l6DTmO5YySyd_c_TIs0JBM';
+
+    // Tabelas (mesmas do cardápio)
+    const TABLE_PRODUCTS   = 'products';
+    const TABLE_CATEGORIES = 'categories';
+
+    // URL de retorno (ajuste se quiser forçar uma rota fixa)
+    const MENU_URL = document.referrer || 'https://www.insightsdelivery.com.br/cardapio/';
+
+    // Garante Supabase carregado (se não tiver no <head>, injeta CDN agora)
+    (function ensureSupabase() {
+      if (window.supabase) return;
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+      s.crossOrigin = 'anonymous';
+      document.head.appendChild(s);
+    })();
+
+    // Aguarda Supabase estar disponível e inicia
+    (function whenSupabaseReady() {
+      if (!window.supabase) { return setTimeout(whenSupabaseReady, 50); }
+
+      try {
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        window.db = db; // expõe global
+
+        // Lê parâmetros da URL
+        const qs = new URLSearchParams(window.location.search);
+        const RESTAURANT_ID = qs.get('restaurant_id') || '';
+        const PRODUCT_ID    = qs.get('product_id')    || ''; // vazio => criar
+        const CATEGORY_ID   = qs.get('category_id')   || '';
+        const CATEGORY_SLUG = qs.get('category_slug') || '';
+
+        // Guarda no escopo global para os próximos passos
+        window.__EDITOR_CTX__ = {
+          RESTAURANT_ID,
+          PRODUCT_ID,
+          CATEGORY_ID,
+          CATEGORY_SLUG,
+          MENU_URL
+        };
+
+        // Log amigável para você validar se veio certo
+        console.log('[Editor] ctx:', window.__EDITOR_CTX__);
+
+        // Sinalização útil para próxima etapa (carregar dados quando for edição)
+        if (PRODUCT_ID) {
+          console.log('[Editor] Modo EDIÇÃO do produto:', PRODUCT_ID);
+        } else {
+          console.log('[Editor] Modo CRIAÇÃO de novo produto na categoria:', CATEGORY_ID, CATEGORY_SLUG);
+        }
+      } catch (e) {
+        console.error('[Editor] Falha ao iniciar Supabase/Contexto:', e);
+        alert('Não foi possível iniciar o editor. Verifique as credenciais do Supabase.');
+      }
+    })();
+  }
+</script>
+
+
+
+
+
+
+</body>
+</html>
