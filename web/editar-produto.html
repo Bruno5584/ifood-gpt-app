@@ -1324,7 +1324,7 @@ async function loadProductIfEdit(){
     if (listContainer) listContainer.innerHTML = '';
 
     if (window.__COMPL && typeof window.__COMPL.loadGroupsForProduct === 'function') {
-      await window.__COMPL.loadGroupsForProduct();
+      await window.__COMPL.loadGroupsForProduct(db, RESTAURANT_ID, PRODUCT_ID);
     }
 
 
@@ -1393,7 +1393,7 @@ async function loadProductIfEdit(){
                       || getFromPath(/\/restaurante\/([^\/?#]+)/i)
                       || '';
   let   PRODUCT_ID    = (ctx.PRODUCT_ID && ctx.PRODUCT_ID.trim())
-                     || (qs.get('product_id') || '').trim()
+                     || (qs.get('product_id') || qs.get('id') || qs.get('pid') || '').trim()
                      || getFromPath(/editar-produto\/([^\/?#]+)/i)
                      || '';
   const CATEGORY_ID   = qs.get('category_id') || '';
@@ -1496,16 +1496,22 @@ async function loadProductIfEdit(){
   }
 
   // === Carregar grupos+itens na EDIÇÃO ===
-  async function loadGroupsForProduct(customDb = db, restaurantId = RESTAURANT_ID, productId = PRODUCT_ID) {
-    if (!customDb) return;
-    if (!restaurantId || !productId) return;
+  async function loadGroupsForProduct(customDb, restaurantId, productId) {
+    const dbClient = customDb || db;
+    const currentRest = (restaurantId || RESTAURANT_ID || '').trim();
+    const currentProd = (productId || PRODUCT_ID || '').trim();
 
-    console.log('[LOAD GROUPS]', { restaurantId, productId });
+    if (!dbClient || !currentRest || !currentProd) {
+      console.warn('[LOAD GROUPS] contexto inválido', { restaurantId: currentRest, productId: currentProd });
+      return;
+    }
+
+    console.log('[LOAD GROUPS] query', { restaurantId: currentRest, productId: currentProd });
 
     const box = document.getElementById('category-list-container');
     if (box) box.innerHTML = '';
 
-    const { data: links, error } = await customDb
+    const { data: links, error } = await dbClient
       .from(TABLE_TREE)
       .select(`
         group_id,
@@ -1528,8 +1534,8 @@ async function loadProductIfEdit(){
           )
         )
       `)
-      .eq(TREE_COLS.restaurant, restaurantId)
-      .eq(TREE_COLS.product, productId)
+      .eq(TREE_COLS.restaurant, currentRest)
+      .eq(TREE_COLS.product, currentProd)
       .order(TREE_COLS.sort, { ascending: true });
 
     if (error) {
@@ -1620,10 +1626,11 @@ window.__COMPL = {
           .from(TABLE_GROUPS)
           .update(groupRecord)
           .eq('id', groupId)
-          .eq('restaurant_id', restaurantId);
+          .eq('restaurant_id', restaurantId)
+          .eq('product_id', productId);
         if (updateError) throw updateError;
       } else {
-        console.log('[SAVE GROUPS] insert group', { title });
+        console.log('[COMPL] insert group', { restaurantId, productId, title, sort_order: i + 1 });
         const { data: inserted, error: insertError } = await db
           .from(TABLE_GROUPS)
           .insert(groupRecord)
@@ -1715,6 +1722,13 @@ window.__COMPL = {
       const price = (window.getPriceDecimal ? window.getPriceDecimal() : 0) || 0;
       const catId = document.getElementById('product-category')?.value || CATEGORY_ID || null;
 
+      console.log('[SAVE] start', {
+        RESTAURANT_ID,
+        PRODUCT_ID_before: PRODUCT_ID,
+        name,
+        catId
+      });
+
       if (!name || !catId) {
         throw new Error('Preencha nome e categoria.');
       }
@@ -1764,6 +1778,9 @@ window.__COMPL = {
 
         if (insP.error) throw insP.error;
         PRODUCT_ID = insP.data.id;
+        if (window.__EDITOR_CTX__) {
+          window.__EDITOR_CTX__.PRODUCT_ID = PRODUCT_ID;
+        }
       } else {
         // ===== EDIÇÃO =====
         const upd = await db.from(TABLE_PRODUCTS)
@@ -1803,7 +1820,6 @@ window.__COMPL = {
       btn.addEventListener('click', (ev) => { handleSaveClick(ev); }); // mantém async/await funcionando
       btn.__bindSave = true;
     }
-    if (PRODUCT_ID) loadGroupsForProduct();
   });
 })();
 </script>
