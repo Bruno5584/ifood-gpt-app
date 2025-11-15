@@ -648,45 +648,44 @@ function toBRLStringFromNumber(vNum){
 }
 
 function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
-  const uid = `cat-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const container = document.getElementById('category-list-container');
+  const uid = `cat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   if (!container) return { uid:null, cardEl:null };
-  const html = `
-    <div class="bg-surface-1 border border-border rounded-lg p-4"
-         data-uid="${uid}"
-         ${groupId ? `data-group-id="${groupId}"` : ''}>
-      <div class="flex justify-between items-center mb-4 gap-4">
-        <div class="flex-1">
-          <input id="category-name-${uid}" type="text" value="${(name||'Nova Categoria')}"
-            class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary w-full"/>
-        </div>
-        <div class="flex items-center gap-2">
-          <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
-            <span class="material-icons-outlined">delete</span>
-          </button>
-        </div>
-      </div>
-      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-        <div class="flex items-end gap-3">
-          <div>
-            <label class="block text-xs text-text-secondary mb-1">Qtd. Mínima</label>
-            <input id="category-min-${uid}" type="number" min="0" value="${Number(min_qty||0)}"
-                   class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-          </div>
-          <div>
-            <label class="block text-xs text-text-secondary mb-1">Qtd. Máxima</label>
-            <input id="category-max-${uid}" type="number" min="0" value="${Number(max_qty||1)}"
-                   class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-          </div>
-        </div>
-        <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm add-complement-btn">
-          <span class="material-icons-outlined text-base">add</span>Adicionar Complemento
-        </button>
-      </div>
-      <div class="space-y-3 complement-list"></div>
-    </div>`;
-  container.insertAdjacentHTML('beforeend', html);
-  return { uid, cardEl: container.lastElementChild };
+
+  // Reaproveita exatamente a mesma marcação criada manualmente (mantém layout)
+  container.insertAdjacentHTML('beforeend', createCategoryHTML(uid));
+  const cardEl = container.lastElementChild;
+  if (!cardEl) return { uid, cardEl:null };
+
+  if (groupId !== null && groupId !== undefined) {
+    cardEl.setAttribute('data-group-id', String(groupId));
+  }
+
+  const nameInput = cardEl.querySelector(`#category-name-${uid}`);
+  if (nameInput) {
+    nameInput.value = name || 'Nova Categoria';
+  }
+
+  const minInput = cardEl.querySelector(`#category-min-${uid}`);
+  if (minInput) {
+    const parsedMin = Number.isFinite(Number(min_qty)) ? Number(min_qty) : 0;
+    minInput.value = parsedMin;
+    updateCategoryMinStatus(minInput);
+  }
+
+  const maxInput = cardEl.querySelector(`#category-max-${uid}`);
+  if (maxInput) {
+    const parsedMax = Number.isFinite(Number(max_qty)) ? Number(max_qty) : 1;
+    maxInput.value = parsedMax;
+  }
+
+  const alertPlaceholder = cardEl.querySelector('.category-alert-placeholder');
+  if (alertPlaceholder) alertPlaceholder.innerHTML = '';
+
+  const complementList = cardEl.querySelector('.complement-list');
+  if (complementList) complementList.innerHTML = '';
+
+  return { uid, cardEl };
 }
 
 
@@ -733,7 +732,8 @@ async function loadGroupsForProduct(db, RESTAURANT_ID, productId){
     const { cardEl } = renderGroupCard({
       name: groupTitle,
       min_qty: l.min_qty,
-      max_qty: l.max_qty
+      max_qty: l.max_qty,
+      groupId: l.group_id
     });
 
     const { data: items, error: itemsErr } = await db
@@ -1515,44 +1515,44 @@ await (window.__COMPL?.loadGroupsForProduct?.());
   };
 
   // === Renderização mínima de cards e linhas (reutiliza seu HTML já existente) ===
-  function renderGroupCard({ name, min_qty, max_qty }) {
-    const uid = `cat-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
     const container = document.getElementById('category-list-container');
+    const uid = `cat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     if (!container) return { uid:null, cardEl:null };
-    const html = `
-      <div class="bg-surface-1 border border-border rounded-lg p-4" data-uid="${uid}">
-        <div class="flex justify-between items-center mb-4 gap-4">
-          <div class="flex-1">
-            <input id="category-name-${uid}" type="text" value="${(name||'Nova Categoria')}"
-              class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary w-full"/>
-          </div>
-          <div class="flex items-center gap-2">
-            <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
-              <span class="material-icons-outlined">delete</span>
-            </button>
-          </div>
-        </div>
-        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-          <div class="flex items-end gap-3">
-            <div>
-              <label class="block text-xs text-text-secondary mb-1">Qtd. Mínima</label>
-              <input id="category-min-${uid}" type="number" min="0" value="${Number(min_qty||0)}"
-                     class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-            </div>
-            <div>
-              <label class="block text-xs text-text-secondary mb-1">Qtd. Máxima</label>
-              <input id="category-max-${uid}" type="number" min="0" value="${Number(max_qty||1)}"
-                     class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-            </div>
-          </div>
-          <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm add-complement-btn">
-            <span class="material-icons-outlined text-base">add</span>Adicionar Complemento
-          </button>
-        </div>
-        <div class="space-y-3 complement-list"></div>
-      </div>`;
-    container.insertAdjacentHTML('beforeend', html);
-    return { uid, cardEl: container.lastElementChild };
+
+    container.insertAdjacentHTML('beforeend', createCategoryHTML(uid));
+    const cardEl = container.lastElementChild;
+    if (!cardEl) return { uid, cardEl:null };
+
+    if (groupId !== null && groupId !== undefined) {
+      cardEl.setAttribute('data-group-id', String(groupId));
+    }
+
+    const nameInput = cardEl.querySelector(`#category-name-${uid}`);
+    if (nameInput) {
+      nameInput.value = name || 'Nova Categoria';
+    }
+
+    const minInput = cardEl.querySelector(`#category-min-${uid}`);
+    if (minInput) {
+      const parsedMin = Number.isFinite(Number(min_qty)) ? Number(min_qty) : 0;
+      minInput.value = parsedMin;
+      updateCategoryMinStatus(minInput);
+    }
+
+    const maxInput = cardEl.querySelector(`#category-max-${uid}`);
+    if (maxInput) {
+      const parsedMax = Number.isFinite(Number(max_qty)) ? Number(max_qty) : 1;
+      maxInput.value = parsedMax;
+    }
+
+    const alertPlaceholder = cardEl.querySelector('.category-alert-placeholder');
+    if (alertPlaceholder) alertPlaceholder.innerHTML = '';
+
+    const complementList = cardEl.querySelector('.complement-list');
+    if (complementList) complementList.innerHTML = '';
+
+    return { uid, cardEl };
   }
 
   function renderModifierRow(cardEl, item) {
@@ -1611,11 +1611,11 @@ await (window.__COMPL?.loadGroupsForProduct?.());
     for (const l of (links||[])) {
       const groupTitle = l.modifier_groups?.title ?? l.modifier_groups?.name ?? '(sem nome)';
       const { cardEl } = renderGroupCard({
-  name: l.modifier_groups?.title ?? l.modifier_groups?.name ?? '(sem nome)',
-  min_qty: l.min_qty,
-  max_qty: l.max_qty,
-  groupId: l.group_id
-});
+        name: groupTitle,
+        min_qty: l.min_qty,
+        max_qty: l.max_qty,
+        groupId: l.group_id
+      });
 
       const { data: items } = await db
         .from(TABLE_ITEMS)
@@ -1638,10 +1638,17 @@ window.__COMPL = {
   if (!RESTAURANT_ID || !PRODUCT_ID) throw new Error('Sem PRODUCT_ID para salvar grupos.');
 
   // 0) apaga vínculos antigos (mantém os grupos; itens serão limpos por grupo)
-  const del = await db.from(TABLE_TREE)
+  const delQuery = db.from(TABLE_TREE)
     .delete()
-    .eq(TREE_COLS.product, PRODUCT_ID)
-    .eq(TREE_COLS.restaurant, RESTAURANT_ID);
+    .eq(TREE_COLS.product, PRODUCT_ID);
+
+  if (RESTAURANT_ID) {
+    const restaurantFilter = encodeURIComponent(RESTAURANT_ID);
+    // inclui registros legados sem restaurant_id para evitar conflitos de chave única
+    delQuery.or(`${TREE_COLS.restaurant}.eq.${restaurantFilter},${TREE_COLS.restaurant}.is.null`);
+  }
+
+  const del = await delQuery;
   if (del.error) throw del.error;
 
   const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
@@ -1651,9 +1658,12 @@ window.__COMPL = {
   for (let i = 0; i < cards.length; i++) {
     const cardEl = cards[i];
     const uid  = cardEl.getAttribute('data-uid');
-    const $t   = cardEl.querySelector(`#category-name-${CSS.escape(uid)}`);
-    const $min = cardEl.querySelector(`#category-min-${CSS.escape(uid)}`);
-    const $max = cardEl.querySelector(`#category-max-${CSS.escape(uid)}`);
+    const esc  = (window.CSS && typeof CSS.escape === 'function')
+      ? CSS.escape(uid)
+      : String(uid || '').replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    const $t   = cardEl.querySelector(`#category-name-${esc}`);
+    const $min = cardEl.querySelector(`#category-min-${esc}`);
+    const $max = cardEl.querySelector(`#category-max-${esc}`);
 
     const title = ($t?.value || '').trim();
     const min   = parseInt(($min?.value || '0'),10) || 0;
@@ -1663,7 +1673,9 @@ window.__COMPL = {
     if (max < min) throw new Error('Na categoria, Máxima deve ser ≥ Mínima.');
 
     // 1) tenta usar o group_id do próprio card
-    let groupId = cardEl.getAttribute('data-group-id');
+    const rawGroupId = cardEl.getAttribute('data-group-id');
+    let groupId = rawGroupId ? Number(rawGroupId) : null;
+    if (Number.isNaN(groupId)) groupId = null;
 
     // 2) se não houver, cria novo grupo (NÃO procura por título para evitar colisão)
     if (!groupId) {
@@ -1681,11 +1693,11 @@ window.__COMPL = {
       if (ins.error) throw ins.error;
       groupId = ins.data.id;
       // grava no DOM para um eventual re-save na mesma sessão
-      cardEl.setAttribute('data-group-id', groupId);
+      cardEl.setAttribute('data-group-id', String(groupId));
     }
 
     // 3) se por acaso já vimos esse groupId neste mesmo save, forçamos grupo novo
-    if (seenGroupIds.has(groupId)) {
+    if (groupId && seenGroupIds.has(String(groupId))) {
       const altTitle = `${title} ${Math.random().toString(36).slice(2,5)}`;
       const ins2 = await db.from(TABLE_GROUPS)
         .insert({
@@ -1699,8 +1711,10 @@ window.__COMPL = {
         .single();
       if (ins2.error) throw ins2.error;
       groupId = ins2.data.id;
-      cardEl.setAttribute('data-group-id', groupId);
+      cardEl.setAttribute('data-group-id', String(groupId));
     }
+
+    if (!groupId) throw new Error('Falha ao preparar categoria para salvar.');
 
     // 4) cria vínculo produto↔grupo (agora sem duplicar)
     const link = await db
@@ -1717,7 +1731,7 @@ window.__COMPL = {
 
     if (link.error) throw link.error;
 
-    seenGroupIds.add(groupId);
+    seenGroupIds.add(String(groupId));
     out.push({ groupId, cardEl });
   }
 
