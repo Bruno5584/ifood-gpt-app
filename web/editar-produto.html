@@ -1384,11 +1384,18 @@ async function loadProductIfEdit(){
 
   // === Contexto (pega por querystring e/ou path) ===
   function getFromPath(regex){ const m = location.pathname.match(regex); return m ? m[1] : ''; }
+  const ctx = window.__EDITOR_CTX__ || {};
   const qs = new URLSearchParams(location.search);
-  const RESTAURANT_ID = (window.RESTAURANT_ID || qs.get('restaurant_id') || '').trim()
-                      || sessionStorage.getItem('RESTAURANT_ID') || getFromPath(/\/restaurante\/([^\/?#]+)/i) || '';
-  let   PRODUCT_ID    = qs.get('product_id') || qs.get('id') || qs.get('pid')
-                     || getFromPath(/editar-produto\/([^\/?#]+)/i) || '';
+  const RESTAURANT_ID = (ctx.RESTAURANT_ID && ctx.RESTAURANT_ID.trim())
+                      || (window.RESTAURANT_ID && String(window.RESTAURANT_ID).trim())
+                      || (qs.get('restaurant_id') || '').trim()
+                      || sessionStorage.getItem('RESTAURANT_ID')
+                      || getFromPath(/\/restaurante\/([^\/?#]+)/i)
+                      || '';
+  let   PRODUCT_ID    = (ctx.PRODUCT_ID && ctx.PRODUCT_ID.trim())
+                     || (qs.get('product_id') || '').trim()
+                     || getFromPath(/editar-produto\/([^\/?#]+)/i)
+                     || '';
   const CATEGORY_ID   = qs.get('category_id') || '';
 
   // === Tabelas (seu schema) ===
@@ -1558,12 +1565,13 @@ window.__COMPL = {
 
   // === Salvar categorias (grupos) do produto ===
   async function saveGroupsForProduct() {
-    if (!RESTAURANT_ID || !PRODUCT_ID) {
-      alert('Salve o produto antes de adicionar complementos.');
-      return;
+    const restaurantId = (RESTAURANT_ID || '').trim();
+    const productId = (PRODUCT_ID || '').trim();
+    if (!restaurantId || !productId) {
+      throw new Error('Produto inválido ao salvar categorias de complementos.');
     }
 
-    console.log('[SAVE GROUPS] start', { RESTAURANT_ID, PRODUCT_ID });
+    console.log('[SAVE GROUPS] start', { restaurantId, productId });
 
     const escapeId = (value) => {
       if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
@@ -1575,8 +1583,8 @@ window.__COMPL = {
     const { error: delError } = await db
       .from(TABLE_TREE)
       .delete()
-      .eq(TREE_COLS.product, PRODUCT_ID)
-      .eq(TREE_COLS.restaurant, RESTAURANT_ID);
+      .eq(TREE_COLS.product, productId)
+      .eq(TREE_COLS.restaurant, restaurantId);
     if (delError) throw delError;
 
     const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
@@ -1599,8 +1607,8 @@ window.__COMPL = {
       let groupId = cardEl.getAttribute('data-group-id');
 
       const groupRecord = {
-        restaurant_id: RESTAURANT_ID,
-        product_id: PRODUCT_ID,
+        restaurant_id: restaurantId,
+        product_id: productId,
         title,
         name: title,
         sort_order: i + 1,
@@ -1612,7 +1620,7 @@ window.__COMPL = {
           .from(TABLE_GROUPS)
           .update(groupRecord)
           .eq('id', groupId)
-          .eq('restaurant_id', RESTAURANT_ID);
+          .eq('restaurant_id', restaurantId);
         if (updateError) throw updateError;
       } else {
         console.log('[SAVE GROUPS] insert group', { title });
@@ -1631,8 +1639,8 @@ window.__COMPL = {
       if (!groupId) continue;
 
       const linkPayload = {
-        restaurant_id: RESTAURANT_ID,
-        product_id: PRODUCT_ID,
+        restaurant_id: restaurantId,
+        product_id: productId,
         group_id: groupId,
         min_qty: min,
         max_qty: max,
@@ -1655,7 +1663,8 @@ window.__COMPL = {
   // === Salvar itens (modifiers) de um grupo ===
   async function saveModifiersForGroup(groupId, cardEl) {
     if (!groupId || !cardEl) return;
-    if (!RESTAURANT_ID) throw new Error('Restaurante não identificado ao salvar complementos.');
+    const restaurantId = (RESTAURANT_ID || '').trim();
+    if (!restaurantId) throw new Error('Restaurante não identificado ao salvar complementos.');
 
     console.log('[SAVE MODIFIERS] start', { groupId });
 
@@ -1675,7 +1684,7 @@ window.__COMPL = {
       if (!name) return;
 
       payload.push({
-        restaurant_id : RESTAURANT_ID,
+        restaurant_id : restaurantId,
         group_id      : groupId,
         name,
         unit_price    : maskToNumber($price?.value || '0'),
