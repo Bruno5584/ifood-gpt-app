@@ -1368,10 +1368,8 @@ async function loadProductIfEdit(){
     if (listContainer) listContainer.innerHTML = '';
 
     if (window.__COMPL && typeof window.__COMPL.loadGroupsForProduct === 'function') {
-      await window.__COMPL.loadGroupsForProduct(db, RESTAURANT_ID, PRODUCT_ID);
+      await window.__COMPL.loadGroupsForProduct();
     }
-
-
 
   }catch(err){
     console.error('[Editor] Falha ao carregar produto/grupos:', err);
@@ -1632,10 +1630,17 @@ window.__COMPL = {
   saveModifiersForGroup
 };
 
+/*
+  Fluxo geral:
+    - handleSaveClick cria ou atualiza o produto e só então chama saveGroupsForProduct.
+    - saveGroupsForProduct é o único ponto que grava modifier_groups + product_groups e delega os itens para saveModifiersForGroup.
+    - loadProductIfEdit, no script principal, invoca window.__COMPL.loadGroupsForProduct para hidratar a UI na edição.
+*/
+
   // === Salvar categorias (grupos) do produto ===
   async function saveGroupsForProduct() {
-    const restaurantId = (RESTAURANT_ID || '').trim();
-    const productId = (PRODUCT_ID || '').trim();
+    const restaurantId = String(RESTAURANT_ID ?? '').trim();
+    const productId = String(PRODUCT_ID ?? '').trim();
     if (!restaurantId || !productId) {
       throw new Error('Produto inválido ao salvar categorias de complementos.');
     }
@@ -1689,7 +1694,7 @@ window.__COMPL = {
       };
 
       if (groupId) {
-        console.log('[SAVE GROUPS] update group', { groupId, title });
+        console.log('[SAVE GROUPS] upsert group', { action: 'update', groupId, title, min, max });
         const { error: updateError } = await db
           .from(TABLE_GROUPS)
           .update(groupRecord)
@@ -1698,7 +1703,7 @@ window.__COMPL = {
           .eq('product_id', productId);
         if (updateError) throw updateError;
       } else {
-        console.log('[COMPL] insert group', { restaurantId, productId, title, sort_order: i + 1 });
+        console.log('[SAVE GROUPS] upsert group', { action: 'insert', restaurantId, productId, title, min, max, sort_order: i + 1 });
         const { data: inserted, error: insertError } = await db
           .from(TABLE_GROUPS)
           .insert(groupRecord)
@@ -1712,6 +1717,7 @@ window.__COMPL = {
       }
 
       if (!groupId) continue;
+      console.log('[SAVE GROUPS] upsert group', { action: 'finalized', groupId, title, min, max });
 
       const linkPayload = {
         restaurant_id: restaurantId,
@@ -1723,7 +1729,7 @@ window.__COMPL = {
         sort_order: i + 1,
       };
 
-      console.log('[SAVE GROUPS] link group', linkPayload);
+      console.log('[SAVE GROUPS] link product_groups', linkPayload);
 
       const { error: upsertError } = await db
         .from(TABLE_TREE)
@@ -1792,6 +1798,7 @@ window.__COMPL = {
       const desc  = (document.getElementById('product-description')?.value || '').trim();
       const price = (window.getPriceDecimal ? window.getPriceDecimal() : 0) || 0;
       const catId = document.getElementById('product-category')?.value || CATEGORY_ID || null;
+      const restaurantId = String(RESTAURANT_ID ?? window.RESTAURANT_ID ?? '').trim();
 
       console.log('[SAVE] start', {
         RESTAURANT_ID,
@@ -1800,18 +1807,21 @@ window.__COMPL = {
         catId
       });
 
+      if (!restaurantId) {
+        throw new Error('Restaurante inválido. Atualize a página e tente novamente.');
+      }
       if (!name || !catId) {
         throw new Error('Preencha nome e categoria.');
       }
 
       // se o badge de modo já tiver o PRODUCT_ID, reaproveita
       if (!PRODUCT_ID && window.__EDITOR_CTX__?.PRODUCT_ID) {
-        PRODUCT_ID = window.__EDITOR_CTX__.PRODUCT_ID;
+        PRODUCT_ID = String(window.__EDITOR_CTX__.PRODUCT_ID);
       }
 
       if (!PRODUCT_ID) {
         // ===== CRIAÇÃO =====
-        console.log('[SAVE PRODUCT] mode=create', { RESTAURANT_ID, category: catId, name });
+        console.log('[SAVE PRODUCT] mode=create', { RESTAURANT_ID: restaurantId, category: catId, name });
         const makeSlug = (t) => {
           const base = (window.slugify ? window.slugify(t) :
             String(t||'').toLowerCase()
@@ -1825,7 +1835,7 @@ window.__COMPL = {
         let slug = makeSlug(name);
 
         let insP = await db.from(TABLE_PRODUCTS).insert({
-          restaurant_id: RESTAURANT_ID,
+          restaurant_id: restaurantId,
           category_id  : catId,
           name,
           slug,
@@ -1838,7 +1848,7 @@ window.__COMPL = {
         if (insP.error && insP.error.code === '23505') {
           slug = `${slug}-${Math.random().toString(36).slice(2,6)}`;
           insP = await db.from(TABLE_PRODUCTS).insert({
-            restaurant_id: RESTAURANT_ID,
+            restaurant_id: restaurantId,
             category_id  : catId,
             name,
             slug,
@@ -1849,15 +1859,16 @@ window.__COMPL = {
         }
 
         if (insP.error) throw insP.error;
-        PRODUCT_ID = insP.data.id;
+        PRODUCT_ID = String(insP.data.id);
         window.PRODUCT_ID = PRODUCT_ID;
         window.__EDITOR_CTX__ = {
           ...(window.__EDITOR_CTX__ || {}),
-          PRODUCT_ID
+          PRODUCT_ID,
+          RESTAURANT_ID: restaurantId
         };
       } else {
         // ===== EDIÇÃO =====
-        console.log('[SAVE PRODUCT] mode=edit', { PRODUCT_ID, RESTAURANT_ID, category: catId, name });
+        console.log('[SAVE PRODUCT] mode=edit', { PRODUCT_ID, RESTAURANT_ID: restaurantId, category: catId, name });
         const upd = await db.from(TABLE_PRODUCTS)
           .update({
             category_id : catId,
@@ -1867,11 +1878,19 @@ window.__COMPL = {
             // não altere o slug na edição para não estourar unique products_restaurant_id_slug_key
           })
           .eq('id', PRODUCT_ID)
-          .eq('restaurant_id', RESTAURANT_ID);
+          .eq('restaurant_id', restaurantId);
 
         if (upd.error) throw upd.error;
         window.PRODUCT_ID = PRODUCT_ID;
+        window.__EDITOR_CTX__ = {
+          ...(window.__EDITOR_CTX__ || {}),
+          PRODUCT_ID,
+          RESTAURANT_ID: restaurantId
+        };
       }
+
+      RESTAURANT_ID = restaurantId;
+      window.RESTAURANT_ID = restaurantId;
 
       if (!PRODUCT_ID) {
         throw new Error('Falha ao obter o ID do produto antes de salvar os complementos.');
