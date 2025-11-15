@@ -1320,12 +1320,14 @@ async function loadProductIfEdit(){
     if (subtitle && data.description) subtitle.textContent = data.description;
 
     // === Grupos + Complementos do produto ===
-    // Limpa UI anterior (se houver)
     const listContainer = document.getElementById('category-list-container');
     if (listContainer) listContainer.innerHTML = '';
-await (window.__COMPL?.loadGroupsForProduct?.());
 
-    
+    if (window.__COMPL && typeof window.__COMPL.loadGroupsForProduct === 'function') {
+      await window.__COMPL.loadGroupsForProduct();
+    }
+
+
 
   }catch(err){
     console.error('[Editor] Falha ao carregar produto/grupos:', err);
@@ -1385,7 +1387,8 @@ await (window.__COMPL?.loadGroupsForProduct?.());
   const qs = new URLSearchParams(location.search);
   const RESTAURANT_ID = (window.RESTAURANT_ID || qs.get('restaurant_id') || '').trim()
                       || sessionStorage.getItem('RESTAURANT_ID') || getFromPath(/\/restaurante\/([^\/?#]+)/i) || '';
-  let   PRODUCT_ID    = qs.get('product_id') || getFromPath(/editar-produto\/([^\/?#]+)/i) || '';
+  let   PRODUCT_ID    = qs.get('product_id') || qs.get('id') || qs.get('pid')
+                     || getFromPath(/editar-produto\/([^\/?#]+)/i) || '';
   const CATEGORY_ID   = qs.get('category_id') || '';
 
   // === Tabelas (seu schema) ===
@@ -1689,7 +1692,7 @@ window.__COMPL = {
     }
   }
 
-  // === Salvar tudo (cria produto se for novo) – ***ASSÍNCRONO*** ===
+  // === Salvar tudo (criação x edição) – produto + complementos ===
   async function handleSaveClick(e){
     e?.preventDefault?.();
     const btn = document.getElementById('saveProductBtn');
@@ -1697,14 +1700,23 @@ window.__COMPL = {
     if (btn) { btn.__saving = true; btn.disabled = true; btn.textContent = 'Salvando...'; }
 
     try {
-      // cria produto se for novo (mandando SLUG)
-      if (!PRODUCT_ID) {
-        const name  = (document.getElementById('product-name')?.value || '').trim();
-        const desc  = (document.getElementById('product-description')?.value || '').trim();
-        const price = (window.getPriceDecimal ? window.getPriceDecimal() : 0) || 0;
-        const catId = document.getElementById('product-category')?.value || CATEGORY_ID || null;
-        if (!name || !catId) throw new Error('Preencha nome e categoria.');
+      // lê sempre o estado atual do formulário
+      const name  = (document.getElementById('product-name')?.value || '').trim();
+      const desc  = (document.getElementById('product-description')?.value || '').trim();
+      const price = (window.getPriceDecimal ? window.getPriceDecimal() : 0) || 0;
+      const catId = document.getElementById('product-category')?.value || CATEGORY_ID || null;
 
+      if (!name || !catId) {
+        throw new Error('Preencha nome e categoria.');
+      }
+
+      // se o badge de modo já tiver o PRODUCT_ID, reaproveita
+      if (!PRODUCT_ID && window.__EDITOR_CTX__?.PRODUCT_ID) {
+        PRODUCT_ID = window.__EDITOR_CTX__.PRODUCT_ID;
+      }
+
+      if (!PRODUCT_ID) {
+        // ===== CRIAÇÃO =====
         const makeSlug = (t) => {
           const base = (window.slugify ? window.slugify(t) :
             String(t||'').toLowerCase()
@@ -1714,23 +1726,27 @@ window.__COMPL = {
           );
           return base || 'produto';
         };
+
         let slug = makeSlug(name);
 
         let insP = await db.from(TABLE_PRODUCTS).insert({
           restaurant_id: RESTAURANT_ID,
           category_id  : catId,
-          name, slug,
+          name,
+          slug,
           description  : desc || null,
           base_price   : price,
           is_active    : true
         }).select('id').single();
 
+        // se já existir slug para esse restaurante, gera um sufixo e tenta de novo
         if (insP.error && insP.error.code === '23505') {
           slug = `${slug}-${Math.random().toString(36).slice(2,6)}`;
           insP = await db.from(TABLE_PRODUCTS).insert({
             restaurant_id: RESTAURANT_ID,
             category_id  : catId,
-            name, slug,
+            name,
+            slug,
             description  : desc || null,
             base_price   : price,
             is_active    : true
@@ -1739,11 +1755,27 @@ window.__COMPL = {
 
         if (insP.error) throw insP.error;
         PRODUCT_ID = insP.data.id;
+      } else {
+        // ===== EDIÇÃO =====
+        const upd = await db.from(TABLE_PRODUCTS)
+          .update({
+            category_id : catId,
+            name,
+            description : desc || null,
+            base_price  : price
+            // não altere o slug na edição para não estourar unique products_restaurant_id_slug_key
+          })
+          .eq('id', PRODUCT_ID)
+          .eq('restaurant_id', RESTAURANT_ID);
+
+        if (upd.error) throw upd.error;
       }
 
-      if (!PRODUCT_ID) throw new Error('Falha ao criar o produto antes de salvar os complementos.');
+      if (!PRODUCT_ID) {
+        throw new Error('Falha ao obter o ID do produto antes de salvar os complementos.');
+      }
 
-      // salva categorias e itens
+      // salva categorias e itens com PRODUCT_ID já garantido
       await saveGroupsForProduct();
 
       alert('Produto salvo com complementos.');
