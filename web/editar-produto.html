@@ -399,17 +399,42 @@
       let value = input.value.replace('R$', '').trim();
       value = value.replace('.', ''); // remove pontos de milhar (se houver)
       value = value.replace(',', '.'); // troca vírgula por ponto para JS
-      
+
       let number = parseFloat(value);
 
       if (isNaN(number)) {
         input.value = '0,00';
         return;
       }
-      
+
       // 2. Formata para BRL (com duas casas decimais e separador de vírgula)
       // Remove o símbolo R$ para permitir que o placeholder R$ seja usado no HTML
       input.value = number.toFixed(2).replace('.', ',');
+    }
+
+    /** Converte um valor numérico para uma string de dígitos (centavos, sem sinal) */
+    function complementPriceToDigits(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return '0';
+      const cents = Math.round(Math.max(0, num) * 100);
+      return String(cents);
+    }
+
+    /** Formata uma string de dígitos (centavos) para o padrão BRL sem prefixo */
+    function complementDigitsToMask(digits) {
+      const clean = String(digits || '').replace(/\D/g, '');
+      const padded = clean.padStart(3, '0');
+      const intPart = padded.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      const decimal = padded.slice(-2);
+      return `${intPart || '0'},${decimal}`;
+    }
+
+    /** Aplica um valor numérico diretamente ao input de preço do complemento */
+    function applyComplementPriceValue(input, value) {
+      if (!input) return;
+      const digits = complementPriceToDigits(value);
+      input.dataset.digits = digits;
+      input.value = complementDigitsToMask(digits);
     }
 
 
@@ -641,52 +666,46 @@
           });
       
           // === FUNÇÕES HELPER PARA COMPLEMENTOS ===
-     // BEGIN:RENDER_HELPERS
-function toBRLStringFromNumber(vNum){
-  const cents = Math.round((Number(vNum) || 0) * 100);
-  return (window.__price?.formatFromDigits?.(String(cents))) || '0,00';
-}
-
+// BEGIN:RENDER_HELPERS
 function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
-  const uid = `cat-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const container = document.getElementById('category-list-container');
+  const uid = `cat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   if (!container) return { uid:null, cardEl:null };
-  const html = `
-    <div class="bg-surface-1 border border-border rounded-lg p-4"
-         data-uid="${uid}"
-         ${groupId ? `data-group-id="${groupId}"` : ''}>
-      <div class="flex justify-between items-center mb-4 gap-4">
-        <div class="flex-1">
-          <input id="category-name-${uid}" type="text" value="${(name||'Nova Categoria')}"
-            class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary w-full"/>
-        </div>
-        <div class="flex items-center gap-2">
-          <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
-            <span class="material-icons-outlined">delete</span>
-          </button>
-        </div>
-      </div>
-      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-        <div class="flex items-end gap-3">
-          <div>
-            <label class="block text-xs text-text-secondary mb-1">Qtd. Mínima</label>
-            <input id="category-min-${uid}" type="number" min="0" value="${Number(min_qty||0)}"
-                   class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-          </div>
-          <div>
-            <label class="block text-xs text-text-secondary mb-1">Qtd. Máxima</label>
-            <input id="category-max-${uid}" type="number" min="0" value="${Number(max_qty||1)}"
-                   class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-          </div>
-        </div>
-        <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm add-complement-btn">
-          <span class="material-icons-outlined text-base">add</span>Adicionar Complemento
-        </button>
-      </div>
-      <div class="space-y-3 complement-list"></div>
-    </div>`;
-  container.insertAdjacentHTML('beforeend', html);
-  return { uid, cardEl: container.lastElementChild };
+
+  // Reaproveita exatamente a mesma marcação criada manualmente (mantém layout)
+  container.insertAdjacentHTML('beforeend', createCategoryHTML(uid));
+  const cardEl = container.lastElementChild;
+  if (!cardEl) return { uid, cardEl:null };
+
+  if (groupId !== null && groupId !== undefined) {
+    cardEl.setAttribute('data-group-id', String(groupId));
+  }
+
+  const nameInput = cardEl.querySelector(`#category-name-${uid}`);
+  if (nameInput) {
+    nameInput.value = name || 'Nova Categoria';
+  }
+
+  const minInput = cardEl.querySelector(`#category-min-${uid}`);
+  if (minInput) {
+    const parsedMin = Number.isFinite(Number(min_qty)) ? Number(min_qty) : 0;
+    minInput.value = parsedMin;
+    updateCategoryMinStatus(minInput);
+  }
+
+  const maxInput = cardEl.querySelector(`#category-max-${uid}`);
+  if (maxInput) {
+    const parsedMax = Number.isFinite(Number(max_qty)) ? Number(max_qty) : 1;
+    maxInput.value = parsedMax;
+  }
+
+  const alertPlaceholder = cardEl.querySelector('.category-alert-placeholder');
+  if (alertPlaceholder) alertPlaceholder.innerHTML = '';
+
+  const complementList = cardEl.querySelector('.complement-list');
+  if (complementList) complementList.innerHTML = '';
+
+  return { uid, cardEl };
 }
 
 
@@ -698,10 +717,22 @@ function renderModifierRow(cardEl, { name, unit_price, description, max_per_item
   list.insertAdjacentHTML('beforeend', createComplementHTML(uniqueId));
 
   const row = list.lastElementChild;
-  row.querySelector(`#comp-name-${uniqueId}`).value  = name || '';
-  row.querySelector(`#comp-price-${uniqueId}`).value = toBRLStringFromNumber(unit_price || 0);
-  row.querySelector(`#comp-qty-${uniqueId}`).value   = Number(max_per_item || 0);
-  row.querySelector(`#comp-desc-${uniqueId}`).value  = description || '';
+  if (!row) return;
+
+  const nameInput = row.querySelector(`#comp-name-${uniqueId}`);
+  if (nameInput) nameInput.value = name || '';
+
+  const priceInput = row.querySelector(`#comp-price-${uniqueId}`);
+  applyComplementPriceValue(priceInput, unit_price || 0);
+
+  const qtyInput = row.querySelector(`#comp-qty-${uniqueId}`);
+  if (qtyInput) {
+    const qty = Number(max_per_item);
+    qtyInput.value = Number.isFinite(qty) ? qty : 1;
+  }
+
+  const descInput = row.querySelector(`#comp-desc-${uniqueId}`);
+  if (descInput) descInput.value = description || '';
 }
 
 /** Busca vínculos do produto e seus grupos + itens */
@@ -733,7 +764,8 @@ async function loadGroupsForProduct(db, RESTAURANT_ID, productId){
     const { cardEl } = renderGroupCard({
       name: groupTitle,
       min_qty: l.min_qty,
-      max_qty: l.max_qty
+      max_qty: l.max_qty,
+      groupId: l.group_id
     });
 
     const { data: items, error: itemsErr } = await db
@@ -1508,87 +1540,71 @@ await (window.__COMPL?.loadGroupsForProduct?.());
 
   // === Helpers de preço (UI usa máscara própria) ===
   const maskToNumber = (v) => Number.parseFloat(String(v||'').replace(/\./g,'').replace(',','.')) || 0;
-  const centsToMask  = (num) => {
-    const c = String(Math.round((Number(num)||0)*100)).padStart(3,'0');
-    const int = c.slice(0,-2).replace(/\B(?=(\d{3})+(?!\d))/g,'.') || '0';
-    return `${int},${c.slice(-2)}`;
-  };
 
   // === Renderização mínima de cards e linhas (reutiliza seu HTML já existente) ===
-  function renderGroupCard({ name, min_qty, max_qty }) {
-    const uid = `cat-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
     const container = document.getElementById('category-list-container');
+    const uid = `cat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     if (!container) return { uid:null, cardEl:null };
-    const html = `
-      <div class="bg-surface-1 border border-border rounded-lg p-4" data-uid="${uid}">
-        <div class="flex justify-between items-center mb-4 gap-4">
-          <div class="flex-1">
-            <input id="category-name-${uid}" type="text" value="${(name||'Nova Categoria')}"
-              class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary w-full"/>
-          </div>
-          <div class="flex items-center gap-2">
-            <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
-              <span class="material-icons-outlined">delete</span>
-            </button>
-          </div>
-        </div>
-        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-          <div class="flex items-end gap-3">
-            <div>
-              <label class="block text-xs text-text-secondary mb-1">Qtd. Mínima</label>
-              <input id="category-min-${uid}" type="number" min="0" value="${Number(min_qty||0)}"
-                     class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-            </div>
-            <div>
-              <label class="block text-xs text-text-secondary mb-1">Qtd. Máxima</label>
-              <input id="category-max-${uid}" type="number" min="0" value="${Number(max_qty||1)}"
-                     class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-            </div>
-          </div>
-          <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm add-complement-btn">
-            <span class="material-icons-outlined text-base">add</span>Adicionar Complemento
-          </button>
-        </div>
-        <div class="space-y-3 complement-list"></div>
-      </div>`;
-    container.insertAdjacentHTML('beforeend', html);
-    return { uid, cardEl: container.lastElementChild };
+
+    container.insertAdjacentHTML('beforeend', createCategoryHTML(uid));
+    const cardEl = container.lastElementChild;
+    if (!cardEl) return { uid, cardEl:null };
+
+    if (groupId !== null && groupId !== undefined) {
+      cardEl.setAttribute('data-group-id', String(groupId));
+    }
+
+    const nameInput = cardEl.querySelector(`#category-name-${uid}`);
+    if (nameInput) {
+      nameInput.value = name || 'Nova Categoria';
+    }
+
+    const minInput = cardEl.querySelector(`#category-min-${uid}`);
+    if (minInput) {
+      const parsedMin = Number.isFinite(Number(min_qty)) ? Number(min_qty) : 0;
+      minInput.value = parsedMin;
+      updateCategoryMinStatus(minInput);
+    }
+
+    const maxInput = cardEl.querySelector(`#category-max-${uid}`);
+    if (maxInput) {
+      const parsedMax = Number.isFinite(Number(max_qty)) ? Number(max_qty) : 1;
+      maxInput.value = parsedMax;
+    }
+
+    const alertPlaceholder = cardEl.querySelector('.category-alert-placeholder');
+    if (alertPlaceholder) alertPlaceholder.innerHTML = '';
+
+    const complementList = cardEl.querySelector('.complement-list');
+    if (complementList) complementList.innerHTML = '';
+
+    return { uid, cardEl };
   }
 
   function renderModifierRow(cardEl, item) {
-    const uid = `comp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-    const list = cardEl.querySelector('.complement-list'); if (!list) return;
-    list.insertAdjacentHTML('beforeend', `
-      <div class="p-3 bg-surface-2 rounded-lg border border-border">
-        <div class="grid grid-cols-[5fr_3fr_3fr_1fr] items-center gap-4">
-          <div class="col-span-5">
-            <input id="comp-name-${uid}" type="text" placeholder="Nome do Complemento"
-              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"
-              value="${item?.name||''}"/>
-          </div>
-          <div class="col-span-3">
-            <div class="relative">
-              <span class="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-sm">R$</span>
-              <input id="comp-price-${uid}" type="text" placeholder="0,00" value="${centsToMask(item?.unit_price||0)}"
-                class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 text-text-primary text-sm"/>
-            </div>
-          </div>
-          <div class="col-span-3">
-            <input id="comp-qty-${uid}" type="number" min="0" value="${Number(item?.max_per_item||0)}"
-              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"/>
-          </div>
-          <div class="col-span-1 flex justify-end">
-            <button class="text-danger hover:text-danger-hover transition p-1 delete-complement-btn">
-              <span class="material-icons-outlined">delete</span>
-            </button>
-          </div>
-        </div>
-        <div class="mt-2">
-          <textarea id="comp-desc-${uid}" rows="1" placeholder="Descrição (opcional)"
-            class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm resize-none">${item?.description||''}</textarea>
-        </div>
-      </div>
-    `);
+    const uid = `comp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const list = cardEl.querySelector('.complement-list');
+    if (!list) return;
+
+    list.insertAdjacentHTML('beforeend', createComplementHTML(uid));
+    const row = list.lastElementChild;
+    if (!row) return;
+
+    const nameInput = row.querySelector(`#comp-name-${uid}`);
+    if (nameInput) nameInput.value = item?.name || '';
+
+    const priceInput = row.querySelector(`#comp-price-${uid}`);
+    applyComplementPriceValue(priceInput, item?.unit_price || 0);
+
+    const qtyInput = row.querySelector(`#comp-qty-${uid}`);
+    if (qtyInput) {
+      const qty = Number(item?.max_per_item);
+      qtyInput.value = Number.isFinite(qty) ? qty : 1;
+    }
+
+    const descInput = row.querySelector(`#comp-desc-${uid}`);
+    if (descInput) descInput.value = item?.description || '';
   }
 
   // === Carregar grupos+itens na EDIÇÃO ===
@@ -1611,11 +1627,11 @@ await (window.__COMPL?.loadGroupsForProduct?.());
     for (const l of (links||[])) {
       const groupTitle = l.modifier_groups?.title ?? l.modifier_groups?.name ?? '(sem nome)';
       const { cardEl } = renderGroupCard({
-  name: l.modifier_groups?.title ?? l.modifier_groups?.name ?? '(sem nome)',
-  min_qty: l.min_qty,
-  max_qty: l.max_qty,
-  groupId: l.group_id
-});
+        name: groupTitle,
+        min_qty: l.min_qty,
+        max_qty: l.max_qty,
+        groupId: l.group_id
+      });
 
       const { data: items } = await db
         .from(TABLE_ITEMS)
@@ -1638,10 +1654,17 @@ window.__COMPL = {
   if (!RESTAURANT_ID || !PRODUCT_ID) throw new Error('Sem PRODUCT_ID para salvar grupos.');
 
   // 0) apaga vínculos antigos (mantém os grupos; itens serão limpos por grupo)
-  const del = await db.from(TABLE_TREE)
+  const delQuery = db.from(TABLE_TREE)
     .delete()
-    .eq(TREE_COLS.product, PRODUCT_ID)
-    .eq(TREE_COLS.restaurant, RESTAURANT_ID);
+    .eq(TREE_COLS.product, PRODUCT_ID);
+
+  if (RESTAURANT_ID) {
+    const restaurantFilter = encodeURIComponent(RESTAURANT_ID);
+    // inclui registros legados sem restaurant_id para evitar conflitos de chave única
+    delQuery.or(`${TREE_COLS.restaurant}.eq.${restaurantFilter},${TREE_COLS.restaurant}.is.null`);
+  }
+
+  const del = await delQuery;
   if (del.error) throw del.error;
 
   const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
@@ -1651,9 +1674,12 @@ window.__COMPL = {
   for (let i = 0; i < cards.length; i++) {
     const cardEl = cards[i];
     const uid  = cardEl.getAttribute('data-uid');
-    const $t   = cardEl.querySelector(`#category-name-${CSS.escape(uid)}`);
-    const $min = cardEl.querySelector(`#category-min-${CSS.escape(uid)}`);
-    const $max = cardEl.querySelector(`#category-max-${CSS.escape(uid)}`);
+    const esc  = (window.CSS && typeof CSS.escape === 'function')
+      ? CSS.escape(uid)
+      : String(uid || '').replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    const $t   = cardEl.querySelector(`#category-name-${esc}`);
+    const $min = cardEl.querySelector(`#category-min-${esc}`);
+    const $max = cardEl.querySelector(`#category-max-${esc}`);
 
     const title = ($t?.value || '').trim();
     const min   = parseInt(($min?.value || '0'),10) || 0;
@@ -1663,7 +1689,9 @@ window.__COMPL = {
     if (max < min) throw new Error('Na categoria, Máxima deve ser ≥ Mínima.');
 
     // 1) tenta usar o group_id do próprio card
-    let groupId = cardEl.getAttribute('data-group-id');
+    const rawGroupId = cardEl.getAttribute('data-group-id');
+    let groupId = rawGroupId ? Number(rawGroupId) : null;
+    if (Number.isNaN(groupId)) groupId = null;
 
     // 2) se não houver, cria novo grupo (NÃO procura por título para evitar colisão)
     if (!groupId) {
@@ -1681,11 +1709,11 @@ window.__COMPL = {
       if (ins.error) throw ins.error;
       groupId = ins.data.id;
       // grava no DOM para um eventual re-save na mesma sessão
-      cardEl.setAttribute('data-group-id', groupId);
+      cardEl.setAttribute('data-group-id', String(groupId));
     }
 
     // 3) se por acaso já vimos esse groupId neste mesmo save, forçamos grupo novo
-    if (seenGroupIds.has(groupId)) {
+    if (groupId && seenGroupIds.has(String(groupId))) {
       const altTitle = `${title} ${Math.random().toString(36).slice(2,5)}`;
       const ins2 = await db.from(TABLE_GROUPS)
         .insert({
@@ -1699,8 +1727,10 @@ window.__COMPL = {
         .single();
       if (ins2.error) throw ins2.error;
       groupId = ins2.data.id;
-      cardEl.setAttribute('data-group-id', groupId);
+      cardEl.setAttribute('data-group-id', String(groupId));
     }
+
+    if (!groupId) throw new Error('Falha ao preparar categoria para salvar.');
 
     // 4) cria vínculo produto↔grupo (agora sem duplicar)
     const link = await db
@@ -1717,7 +1747,7 @@ window.__COMPL = {
 
     if (link.error) throw link.error;
 
-    seenGroupIds.add(groupId);
+    seenGroupIds.add(String(groupId));
     out.push({ groupId, cardEl });
   }
 
