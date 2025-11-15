@@ -399,17 +399,42 @@
       let value = input.value.replace('R$', '').trim();
       value = value.replace('.', ''); // remove pontos de milhar (se houver)
       value = value.replace(',', '.'); // troca vírgula por ponto para JS
-      
+
       let number = parseFloat(value);
 
       if (isNaN(number)) {
         input.value = '0,00';
         return;
       }
-      
+
       // 2. Formata para BRL (com duas casas decimais e separador de vírgula)
       // Remove o símbolo R$ para permitir que o placeholder R$ seja usado no HTML
       input.value = number.toFixed(2).replace('.', ',');
+    }
+
+    /** Converte um valor numérico para uma string de dígitos (centavos, sem sinal) */
+    function complementPriceToDigits(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return '0';
+      const cents = Math.round(Math.max(0, num) * 100);
+      return String(cents);
+    }
+
+    /** Formata uma string de dígitos (centavos) para o padrão BRL sem prefixo */
+    function complementDigitsToMask(digits) {
+      const clean = String(digits || '').replace(/\D/g, '');
+      const padded = clean.padStart(3, '0');
+      const intPart = padded.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      const decimal = padded.slice(-2);
+      return `${intPart || '0'},${decimal}`;
+    }
+
+    /** Aplica um valor numérico diretamente ao input de preço do complemento */
+    function applyComplementPriceValue(input, value) {
+      if (!input) return;
+      const digits = complementPriceToDigits(value);
+      input.dataset.digits = digits;
+      input.value = complementDigitsToMask(digits);
     }
 
 
@@ -641,12 +666,7 @@
           });
       
           // === FUNÇÕES HELPER PARA COMPLEMENTOS ===
-     // BEGIN:RENDER_HELPERS
-function toBRLStringFromNumber(vNum){
-  const cents = Math.round((Number(vNum) || 0) * 100);
-  return (window.__price?.formatFromDigits?.(String(cents))) || '0,00';
-}
-
+// BEGIN:RENDER_HELPERS
 function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
   const container = document.getElementById('category-list-container');
   const uid = `cat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -697,10 +717,22 @@ function renderModifierRow(cardEl, { name, unit_price, description, max_per_item
   list.insertAdjacentHTML('beforeend', createComplementHTML(uniqueId));
 
   const row = list.lastElementChild;
-  row.querySelector(`#comp-name-${uniqueId}`).value  = name || '';
-  row.querySelector(`#comp-price-${uniqueId}`).value = toBRLStringFromNumber(unit_price || 0);
-  row.querySelector(`#comp-qty-${uniqueId}`).value   = Number(max_per_item || 0);
-  row.querySelector(`#comp-desc-${uniqueId}`).value  = description || '';
+  if (!row) return;
+
+  const nameInput = row.querySelector(`#comp-name-${uniqueId}`);
+  if (nameInput) nameInput.value = name || '';
+
+  const priceInput = row.querySelector(`#comp-price-${uniqueId}`);
+  applyComplementPriceValue(priceInput, unit_price || 0);
+
+  const qtyInput = row.querySelector(`#comp-qty-${uniqueId}`);
+  if (qtyInput) {
+    const qty = Number(max_per_item);
+    qtyInput.value = Number.isFinite(qty) ? qty : 1;
+  }
+
+  const descInput = row.querySelector(`#comp-desc-${uniqueId}`);
+  if (descInput) descInput.value = description || '';
 }
 
 /** Busca vínculos do produto e seus grupos + itens */
@@ -1508,11 +1540,6 @@ await (window.__COMPL?.loadGroupsForProduct?.());
 
   // === Helpers de preço (UI usa máscara própria) ===
   const maskToNumber = (v) => Number.parseFloat(String(v||'').replace(/\./g,'').replace(',','.')) || 0;
-  const centsToMask  = (num) => {
-    const c = String(Math.round((Number(num)||0)*100)).padStart(3,'0');
-    const int = c.slice(0,-2).replace(/\B(?=(\d{3})+(?!\d))/g,'.') || '0';
-    return `${int},${c.slice(-2)}`;
-  };
 
   // === Renderização mínima de cards e linhas (reutiliza seu HTML já existente) ===
   function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
@@ -1564,15 +1591,20 @@ await (window.__COMPL?.loadGroupsForProduct?.());
     const row = list.lastElementChild;
     if (!row) return;
 
-    const setValue = (selector, value) => {
-      const input = row.querySelector(selector);
-      if (input) input.value = value;
-    };
+    const nameInput = row.querySelector(`#comp-name-${uid}`);
+    if (nameInput) nameInput.value = item?.name || '';
 
-    setValue(`#comp-name-${uid}`, item?.name || '');
-    setValue(`#comp-price-${uid}`, centsToMask(item?.unit_price || 0));
-    setValue(`#comp-qty-${uid}`, Number(item?.max_per_item || 0));
-    setValue(`#comp-desc-${uid}`, item?.description || '');
+    const priceInput = row.querySelector(`#comp-price-${uid}`);
+    applyComplementPriceValue(priceInput, item?.unit_price || 0);
+
+    const qtyInput = row.querySelector(`#comp-qty-${uid}`);
+    if (qtyInput) {
+      const qty = Number(item?.max_per_item);
+      qtyInput.value = Number.isFinite(qty) ? qty : 1;
+    }
+
+    const descInput = row.querySelector(`#comp-desc-${uid}`);
+    if (descInput) descInput.value = item?.description || '';
   }
 
   // === Carregar grupos+itens na EDIÇÃO ===
