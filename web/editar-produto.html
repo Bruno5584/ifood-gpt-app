@@ -1635,94 +1635,104 @@ window.__COMPL = {
 
   // === Salvar categorias (grupos) do produto ===
   async function saveGroupsForProduct() {
-  if (!RESTAURANT_ID || !PRODUCT_ID) throw new Error('Sem PRODUCT_ID para salvar grupos.');
-
-  // 0) apaga vínculos antigos (mantém os grupos; itens serão limpos por grupo)
-  const del = await db.from(TABLE_TREE)
-    .delete()
-    .eq(TREE_COLS.product, PRODUCT_ID)
-    .eq(TREE_COLS.restaurant, RESTAURANT_ID);
-  if (del.error) throw del.error;
-
-  const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
-  const out = [];
-  const seenGroupIds = new Set(); // evita (product_id,group_id) duplicado
-
-  for (let i = 0; i < cards.length; i++) {
-    const cardEl = cards[i];
-    const uid  = cardEl.getAttribute('data-uid');
-    const $t   = cardEl.querySelector(`#category-name-${CSS.escape(uid)}`);
-    const $min = cardEl.querySelector(`#category-min-${CSS.escape(uid)}`);
-    const $max = cardEl.querySelector(`#category-max-${CSS.escape(uid)}`);
-
-    const title = ($t?.value || '').trim();
-    const min   = parseInt(($min?.value || '0'),10) || 0;
-    const max   = parseInt(($max?.value || '0'),10) || 0;
-
-    if (!title) throw new Error('Informe o nome da categoria.');
-    if (max < min) throw new Error('Na categoria, Máxima deve ser ≥ Mínima.');
-
-    // 1) tenta usar o group_id do próprio card
-    let groupId = cardEl.getAttribute('data-group-id');
-
-    // 2) se não houver, cria novo grupo (NÃO procura por título para evitar colisão)
-    if (!groupId) {
-      const uniqueTitle = title; // pode manter o mesmo nome; id será novo
-      const ins = await db.from(TABLE_GROUPS)
-        .insert({
-          restaurant_id: RESTAURANT_ID,
-          product_id: PRODUCT_ID,
-          title: uniqueTitle,
-          name : uniqueTitle,
-          sort_order: i + 1
-        })
-        .select('id')
-        .single();
-      if (ins.error) throw ins.error;
-      groupId = ins.data.id;
-      // grava no DOM para um eventual re-save na mesma sessão
-      cardEl.setAttribute('data-group-id', groupId);
+    if (!RESTAURANT_ID || !PRODUCT_ID) {
+      throw new Error('Sem PRODUCT_ID para salvar grupos.');
     }
 
-    // 3) se por acaso já vimos esse groupId neste mesmo save, forçamos grupo novo
-    if (seenGroupIds.has(groupId)) {
-      const altTitle = `${title} ${Math.random().toString(36).slice(2,5)}`;
-      const ins2 = await db.from(TABLE_GROUPS)
-        .insert({
-          restaurant_id: RESTAURANT_ID,
-          product_id: PRODUCT_ID,
-          title: altTitle,
-          name : altTitle,
-          sort_order: i + 1
-        })
-        .select('id')
-        .single();
-      if (ins2.error) throw ins2.error;
-      groupId = ins2.data.id;
-      cardEl.setAttribute('data-group-id', groupId);
+    const escapeId = (value) => {
+      if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+        return CSS.escape(value);
+      }
+      return String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
+    };
+
+    const { error: delError } = await db
+      .from(TABLE_TREE)
+      .delete()
+      .eq(TREE_COLS.product, PRODUCT_ID)
+      .eq(TREE_COLS.restaurant, RESTAURANT_ID);
+    if (delError) throw delError;
+
+    const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
+    const upsertPayload = [];
+    const out = [];
+    const seenLinks = new Set();
+
+    for (let i = 0; i < cards.length; i++) {
+      const cardEl = cards[i];
+      const uid = cardEl.getAttribute('data-uid') || '';
+      const safeUid = escapeId(uid);
+      const $t = cardEl.querySelector(`#category-name-${safeUid}`);
+      const $min = cardEl.querySelector(`#category-min-${safeUid}`);
+      const $max = cardEl.querySelector(`#category-max-${safeUid}`);
+
+      const title = ($t?.value || '').trim();
+      const min = parseInt(($min?.value || '0'), 10) || 0;
+      const max = parseInt(($max?.value || '0'), 10) || 0;
+
+      if (!title) throw new Error('Informe o nome da categoria.');
+      if (max < min) throw new Error('Na categoria, Máxima deve ser ≥ Mínima.');
+
+      let groupId = cardEl.getAttribute('data-group-id');
+
+      if (!groupId) {
+        const ins = await db
+          .from(TABLE_GROUPS)
+          .insert({
+            restaurant_id: RESTAURANT_ID,
+            product_id: PRODUCT_ID,
+            title,
+            name: title,
+            sort_order: i + 1,
+          })
+          .select('id')
+          .single();
+        if (ins.error) throw ins.error;
+        groupId = ins.data.id;
+        cardEl.setAttribute('data-group-id', groupId);
+      }
+
+      if (seenLinks.has(groupId)) {
+        const uniqueTitle = `${title} ${Math.random().toString(36).slice(2, 5)}`;
+        const insDup = await db
+          .from(TABLE_GROUPS)
+          .insert({
+            restaurant_id: RESTAURANT_ID,
+            product_id: PRODUCT_ID,
+            title: uniqueTitle,
+            name: uniqueTitle,
+            sort_order: i + 1,
+          })
+          .select('id')
+          .single();
+        if (insDup.error) throw insDup.error;
+        groupId = insDup.data.id;
+        cardEl.setAttribute('data-group-id', groupId);
+      }
+
+      seenLinks.add(groupId);
+      upsertPayload.push({
+        restaurant_id: RESTAURANT_ID,
+        product_id: PRODUCT_ID,
+        group_id: groupId,
+        min_qty: min,
+        max_qty: max,
+        is_required: min >= 1,
+        sort_order: i + 1,
+      });
+
+      out.push({ groupId, cardEl });
     }
 
-    // 4) cria vínculo produto↔grupo (agora sem duplicar)
-    const link = await db
-  .from(TABLE_TREE)
-  .upsert({
-    restaurant_id: RESTAURANT_ID,
-    product_id: PRODUCT_ID,
-    group_id: groupId,
-    min_qty: min,
-    max_qty: max,
-    is_required: min >= 1,
-    sort_order: i + 1
-  }, { onConflict: 'product_id,group_id', ignoreDuplicates: true });
+    if (upsertPayload.length) {
+      const { error: upsertError } = await db
+        .from(TABLE_TREE)
+        .upsert(upsertPayload, { onConflict: 'product_id,group_id' });
+      if (upsertError) throw upsertError;
+    }
 
-    if (link.error) throw link.error;
-
-    seenGroupIds.add(groupId);
-    out.push({ groupId, cardEl });
+    return out;
   }
-
-  return out;
-}
 
 
   // === Salvar itens (modifiers) de um grupo ===
