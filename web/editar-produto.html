@@ -76,6 +76,56 @@
 <!-- Supabase CDN (precisa vir ANTES do script do editor) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<!-- Contexto compartilhado entre todos os scripts do editor -->
+<script>
+  let RESTAURANT_ID = window.RESTAURANT_ID ? String(window.RESTAURANT_ID).trim() : '';
+  let PRODUCT_ID    = window.PRODUCT_ID ? String(window.PRODUCT_ID).trim() : '';
+  let CATEGORY_ID   = window.CATEGORY_ID ? String(window.CATEGORY_ID).trim() : '';
+
+  (function syncEditorContext(){
+    const ctx = window.__EDITOR_CTX__ || {};
+    const qs = new URLSearchParams(window.location.search || '');
+    const fromPath = (regex) => {
+      const match = window.location.pathname.match(regex);
+      return match ? match[1] : '';
+    };
+
+    const resolvedRestaurant =
+      (ctx.RESTAURANT_ID && ctx.RESTAURANT_ID.trim()) ||
+      RESTAURANT_ID ||
+      (qs.get('restaurant_id') || qs.get('rid') || '').trim() ||
+      (sessionStorage.getItem('RESTAURANT_ID') || '').trim() ||
+      fromPath(/\/restaurante\/([^\/?#]+)/i) ||
+      '';
+
+    const resolvedProduct =
+      (ctx.PRODUCT_ID && ctx.PRODUCT_ID.trim()) ||
+      PRODUCT_ID ||
+      (qs.get('product_id') || qs.get('id') || qs.get('pid') || '').trim() ||
+      fromPath(/editar-produto\/([^\/?#]+)/i) ||
+      '';
+
+    const resolvedCategory =
+      (ctx.CATEGORY_ID && ctx.CATEGORY_ID.trim()) ||
+      CATEGORY_ID ||
+      (qs.get('category_id') || qs.get('cid') || '').trim();
+
+    RESTAURANT_ID = resolvedRestaurant;
+    PRODUCT_ID = resolvedProduct;
+    CATEGORY_ID = resolvedCategory;
+
+    window.RESTAURANT_ID = RESTAURANT_ID;
+    window.PRODUCT_ID = PRODUCT_ID;
+    window.CATEGORY_ID = CATEGORY_ID;
+    window.__EDITOR_CTX__ = {
+      ...ctx,
+      RESTAURANT_ID,
+      PRODUCT_ID,
+      CATEGORY_ID
+    };
+  })();
+</script>
+
 
 
 </head>
@@ -452,25 +502,26 @@
       // === GUARDA: tenta obter RESTAURANT_ID sem mostrar banner ===
       (function () {
         const url = new URL(window.location.href);
-      
+
         // 1) querystring
-        let RESTAURANT_ID = (url.searchParams.get('restaurant_id') || '').trim();
-      
+        let foundRestaurantId = (url.searchParams.get('restaurant_id') || '').trim();
+
         // 2) sessionStorage (caso tenha vindo do Cardápio)
-        if (!RESTAURANT_ID) {
-          RESTAURANT_ID = (sessionStorage.getItem('RESTAURANT_ID') || '').trim();
+        if (!foundRestaurantId) {
+          foundRestaurantId = (sessionStorage.getItem('RESTAURANT_ID') || '').trim();
         }
-      
+
         // 3) path (UUID no caminho)
-        if (!RESTAURANT_ID) {
+        if (!foundRestaurantId) {
           const guess = url.pathname.split('/').find(s => /^[0-9a-f-]{16,36}$/i.test(s));
-          if (guess) RESTAURANT_ID = guess;
+          if (guess) foundRestaurantId = guess;
         }
-      
+
         // guarda (sem mostrar banner)
-        window.RESTAURANT_ID = RESTAURANT_ID || '';
-        if (RESTAURANT_ID) sessionStorage.setItem('RESTAURANT_ID', RESTAURANT_ID);
-      
+        window.RESTAURANT_ID = foundRestaurantId || '';
+        if (foundRestaurantId) sessionStorage.setItem('RESTAURANT_ID', foundRestaurantId);
+        RESTAURANT_ID = window.RESTAURANT_ID || '';
+
         console.log('[Editor] RESTAURANT_ID:', RESTAURANT_ID || '(vazio)');
       })();
       
@@ -757,9 +808,18 @@ function createCategoryHTML(uniqueId) {
     setTimeout(()=>{ el.style.display='none'; }, 2200);
   }
   function qp(name){ try{ return new URL(location.href).searchParams.get(name)||''; }catch{ return ''; } }
-
-  const RESTAURANT_ID = window.RESTAURANT_ID || qp('restaurant_id') || sessionStorage.getItem('RESTAURANT_ID') || '';
-  const PRODUCT_ID    = qp('product_id') || '';
+  const getRestaurantId = () => {
+    const fallback = (qp('restaurant_id') || sessionStorage.getItem('RESTAURANT_ID') || '').trim();
+    const resolved = (window.RESTAURANT_ID || RESTAURANT_ID || fallback || '').trim();
+    if (!RESTAURANT_ID && resolved) RESTAURANT_ID = resolved;
+    return resolved;
+  };
+  const getProductId = () => {
+    const fallback = (qp('product_id') || '').trim();
+    const resolved = (window.PRODUCT_ID || PRODUCT_ID || fallback || '').trim();
+    if (!PRODUCT_ID && resolved) { PRODUCT_ID = resolved; window.PRODUCT_ID = resolved; }
+    return resolved;
+  };
   window.__productActive = true; // default UI
 
   const pauseBtn   = $('#pauseProductBtn');
@@ -796,19 +856,23 @@ function createCategoryHTML(uniqueId) {
   }
 
   async function initStatusFromDB(){
-    if(!PRODUCT_ID || !RESTAURANT_ID) return;
+    const restaurantId = getRestaurantId();
+    const productId = getProductId();
+    if(!productId || !restaurantId) return;
     const { data, error } = await db.from(TABLE_PRODUCTS)
-      .select('is_active').eq('id', PRODUCT_ID).eq('restaurant_id', RESTAURANT_ID).maybeSingle();
+      .select('is_active').eq('id', productId).eq('restaurant_id', restaurantId).maybeSingle();
     if(error){ console.error(error); return; }
     setStatusUI(!!(data && data.is_active));
   }
 
   async function toggleStatus(){
-    if(!PRODUCT_ID){ showToast('Salve o produto antes de pausar.', 'warn'); return; }
+    const restaurantId = getRestaurantId();
+    const productId = getProductId();
+    if(!productId){ showToast('Salve o produto antes de pausar.', 'warn'); return; }
     const wantActive = (statusText?.textContent||'Ativo') !== 'Ativo';
     setStatusUI(wantActive); // otimista
     const { error } = await db.from(TABLE_PRODUCTS)
-      .update({ is_active: wantActive }).eq('id', PRODUCT_ID).eq('restaurant_id', RESTAURANT_ID);
+      .update({ is_active: wantActive }).eq('id', productId).eq('restaurant_id', restaurantId);
     if(error){
       setStatusUI(!wantActive);
       console.error(error); showToast('Falha ao atualizar status.', 'err'); return;
@@ -846,11 +910,24 @@ function createCategoryHTML(uniqueId) {
     }
 
     function init() {
-      const PRODUCT_ID    = getParam(['product_id','id','pid']);
-      const CATEGORY_ID   = getParam(['category_id','cid']);
-      const RESTAURANT_ID = getParam(['restaurant_id','rid']);
+      const ctx = window.__EDITOR_CTX__ || {};
+      const resolvedProduct = (ctx.PRODUCT_ID && ctx.PRODUCT_ID.trim()) || PRODUCT_ID || getParam(['product_id','id','pid']) || '';
+      const resolvedCategory = (ctx.CATEGORY_ID && ctx.CATEGORY_ID.trim()) || CATEGORY_ID || getParam(['category_id','cid']) || '';
+      const resolvedRestaurant = (ctx.RESTAURANT_ID && ctx.RESTAURANT_ID.trim()) || RESTAURANT_ID || getParam(['restaurant_id','rid']) || '';
 
-      window.__EDITOR_CTX__ = { PRODUCT_ID, CATEGORY_ID, RESTAURANT_ID };
+      PRODUCT_ID = resolvedProduct;
+      CATEGORY_ID = resolvedCategory;
+      RESTAURANT_ID = resolvedRestaurant;
+      window.PRODUCT_ID = PRODUCT_ID;
+      window.CATEGORY_ID = CATEGORY_ID;
+      window.RESTAURANT_ID = RESTAURANT_ID;
+
+      window.__EDITOR_CTX__ = {
+        ...ctx,
+        PRODUCT_ID,
+        CATEGORY_ID,
+        RESTAURANT_ID
+      };
 
       const mode = PRODUCT_ID ? 'edit' : 'create';
 
@@ -1164,28 +1241,6 @@ const TABLE_CATEGORIES = 'categories';
       .replace(/\-\-+/g,'-').replace(/^-+/, '').replace(/-+$/, '');
   }
 
-  // 3) Pega contexto via URL (com fallbacks iguais ao restante da página)
-function getFromPath(regex){
-  const m = location.pathname.match(regex);
-  return m ? m[1] : '';
-}
-
-const RESTAURANT_ID =
-  (window.RESTAURANT_ID || '').trim() ||
-  qp('restaurant_id') ||
-  sessionStorage.getItem('RESTAURANT_ID') ||
-  getFromPath(/\/restaurante\/([^\/?#]+)/i) || // se você usar esse padrão em outra rota, ajuste
-  '';
-
-const PRODUCT_ID =
-  qp('product_id') ||
-  getFromPath(/editar-produto\/([^\/?#]+)/i) ||
-  '';
-
-const CATEGORY_ID = qp('category_id') || '';
-
-
-
   // 4) Inicializa Supabase
   if (!window.supabase) { console.error('Supabase CDN não carregada.'); return; }
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -1215,8 +1270,8 @@ async function loadCategories() {
   $catSel.innerHTML = '<option value="" disabled selected hidden>Selecione uma categoria</option>';
 
   // valida RESTAURANT_ID
-  const RESTAURANT_ID = (window.RESTAURANT_ID || new URL(location.href).searchParams.get('restaurant_id') || '').trim();
-  if (!RESTAURANT_ID) {
+  const restaurantId = (RESTAURANT_ID || window.RESTAURANT_ID || '').trim();
+  if (!restaurantId) {
     console.warn('[Editor] Sem RESTAURANT_ID para carregar categorias.');
     return;
   }
@@ -1226,7 +1281,7 @@ async function loadCategories() {
     .createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     .from(TABLE_CATEGORIES)
     .select('id,name')
-    .eq('restaurant_id', RESTAURANT_ID)
+    .eq('restaurant_id', restaurantId)
     .order('sort_order', { ascending: true, nullsLast: true })
     .order('name', { ascending: true });
 
@@ -1274,6 +1329,15 @@ async function loadProductIfEdit(){
       .maybeSingle();
     if (error) throw error;
     if (!data) return;
+
+    if (data.id) {
+      PRODUCT_ID = String(data.id);
+      window.PRODUCT_ID = PRODUCT_ID;
+      window.__EDITOR_CTX__ = {
+        ...(window.__EDITOR_CTX__ || {}),
+        PRODUCT_ID
+      };
+    }
 
     // Campos principais
     if ($name) $name.value = data.name || '';
@@ -1332,8 +1396,7 @@ async function loadProductIfEdit(){
     loadCategories().then(() => { // CORREÇÃO: Usado .then()
   
       // 2) Decide: edição x criação (suporta path)
-      const qs  = new URLSearchParams(location.search);
-      const pid = qs.get('product_id') || (location.pathname.match(/editar-produto\/([^\/?#]+)/i)?.[1] || '');
+      const pid = (PRODUCT_ID || '').trim();
   
       if (pid) {
         loadProductIfEdit().then(() => { // CORREÇÃO: Usado .then()
@@ -1366,17 +1429,40 @@ async function loadProductIfEdit(){
   function getFromPath(regex){ const m = location.pathname.match(regex); return m ? m[1] : ''; }
   const ctx = window.__EDITOR_CTX__ || {};
   const qs = new URLSearchParams(location.search);
-  const RESTAURANT_ID = (ctx.RESTAURANT_ID && ctx.RESTAURANT_ID.trim())
-                      || (window.RESTAURANT_ID && String(window.RESTAURANT_ID).trim())
-                      || (qs.get('restaurant_id') || '').trim()
-                      || sessionStorage.getItem('RESTAURANT_ID')
-                      || getFromPath(/\/restaurante\/([^\/?#]+)/i)
-                      || '';
-  let   PRODUCT_ID    = (ctx.PRODUCT_ID && ctx.PRODUCT_ID.trim())
-                     || (qs.get('product_id') || qs.get('id') || qs.get('pid') || '').trim()
-                     || getFromPath(/editar-produto\/([^\/?#]+)/i)
-                     || '';
-  const CATEGORY_ID   = qs.get('category_id') || '';
+  const existingRestaurant = (RESTAURANT_ID || '').trim();
+  const existingProduct = (PRODUCT_ID || '').trim();
+  const existingCategory = (CATEGORY_ID || '').trim();
+
+  const resolvedRestaurantId = (ctx.RESTAURANT_ID && ctx.RESTAURANT_ID.trim())
+    || existingRestaurant
+    || (window.RESTAURANT_ID && String(window.RESTAURANT_ID).trim())
+    || (qs.get('restaurant_id') || '').trim()
+    || sessionStorage.getItem('RESTAURANT_ID')
+    || getFromPath(/\/restaurante\/([^\/?#]+)/i)
+    || '';
+
+  const resolvedProductId = (ctx.PRODUCT_ID && ctx.PRODUCT_ID.trim())
+    || existingProduct
+    || (qs.get('product_id') || qs.get('id') || qs.get('pid') || '').trim()
+    || getFromPath(/editar-produto\/([^\/?#]+)/i)
+    || '';
+
+  const resolvedCategoryId = (ctx.CATEGORY_ID && ctx.CATEGORY_ID.trim())
+    || existingCategory
+    || (qs.get('category_id') || '').trim();
+
+  RESTAURANT_ID = resolvedRestaurantId;
+  PRODUCT_ID = resolvedProductId;
+  CATEGORY_ID = resolvedCategoryId;
+  window.RESTAURANT_ID = RESTAURANT_ID;
+  window.PRODUCT_ID = PRODUCT_ID;
+  window.CATEGORY_ID = CATEGORY_ID;
+  window.__EDITOR_CTX__ = {
+    ...ctx,
+    RESTAURANT_ID,
+    PRODUCT_ID,
+    CATEGORY_ID
+  };
 
   // === Tabelas (seu schema) ===
   const TABLE_PRODUCTS = 'products';
@@ -1563,6 +1649,8 @@ window.__COMPL = {
       return String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
     };
 
+    console.log('[SAVE GROUPS] clearing links', { productId });
+
     const { error: delError } = await db
       .from(TABLE_TREE)
       .delete()
@@ -1655,7 +1743,11 @@ window.__COMPL = {
 
     console.log('[SAVE MODIFIERS] start', { groupId });
 
-    const del = await db.from(TABLE_ITEMS).delete().eq('group_id', groupId);
+    console.log('[SAVE MODIFIERS] delete old', { groupId });
+    const del = await db.from(TABLE_ITEMS)
+      .delete()
+      .eq('group_id', groupId)
+      .eq('restaurant_id', restaurantId);
     if (del.error) throw del.error;
 
     const rows = Array.from(cardEl.querySelectorAll('.complement-list > div.p-3.bg-surface-2'));
@@ -1719,6 +1811,7 @@ window.__COMPL = {
 
       if (!PRODUCT_ID) {
         // ===== CRIAÇÃO =====
+        console.log('[SAVE PRODUCT] mode=create', { RESTAURANT_ID, category: catId, name });
         const makeSlug = (t) => {
           const base = (window.slugify ? window.slugify(t) :
             String(t||'').toLowerCase()
@@ -1757,11 +1850,14 @@ window.__COMPL = {
 
         if (insP.error) throw insP.error;
         PRODUCT_ID = insP.data.id;
-        if (window.__EDITOR_CTX__) {
-          window.__EDITOR_CTX__.PRODUCT_ID = PRODUCT_ID;
-        }
+        window.PRODUCT_ID = PRODUCT_ID;
+        window.__EDITOR_CTX__ = {
+          ...(window.__EDITOR_CTX__ || {}),
+          PRODUCT_ID
+        };
       } else {
         // ===== EDIÇÃO =====
+        console.log('[SAVE PRODUCT] mode=edit', { PRODUCT_ID, RESTAURANT_ID, category: catId, name });
         const upd = await db.from(TABLE_PRODUCTS)
           .update({
             category_id : catId,
@@ -1774,6 +1870,7 @@ window.__COMPL = {
           .eq('restaurant_id', RESTAURANT_ID);
 
         if (upd.error) throw upd.error;
+        window.PRODUCT_ID = PRODUCT_ID;
       }
 
       if (!PRODUCT_ID) {
