@@ -1556,39 +1556,23 @@ await (window.__COMPL?.loadGroupsForProduct?.());
   }
 
   function renderModifierRow(cardEl, item) {
-    const uid = `comp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-    const list = cardEl.querySelector('.complement-list'); if (!list) return;
-    list.insertAdjacentHTML('beforeend', `
-      <div class="p-3 bg-surface-2 rounded-lg border border-border">
-        <div class="grid grid-cols-[5fr_3fr_3fr_1fr] items-center gap-4">
-          <div class="col-span-5">
-            <input id="comp-name-${uid}" type="text" placeholder="Nome do Complemento"
-              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"
-              value="${item?.name||''}"/>
-          </div>
-          <div class="col-span-3">
-            <div class="relative">
-              <span class="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-sm">R$</span>
-              <input id="comp-price-${uid}" type="text" placeholder="0,00" value="${centsToMask(item?.unit_price||0)}"
-                class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 text-text-primary text-sm"/>
-            </div>
-          </div>
-          <div class="col-span-3">
-            <input id="comp-qty-${uid}" type="number" min="0" value="${Number(item?.max_per_item||0)}"
-              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"/>
-          </div>
-          <div class="col-span-1 flex justify-end">
-            <button class="text-danger hover:text-danger-hover transition p-1 delete-complement-btn">
-              <span class="material-icons-outlined">delete</span>
-            </button>
-          </div>
-        </div>
-        <div class="mt-2">
-          <textarea id="comp-desc-${uid}" rows="1" placeholder="Descrição (opcional)"
-            class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm resize-none">${item?.description||''}</textarea>
-        </div>
-      </div>
-    `);
+    const uid = `comp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const list = cardEl.querySelector('.complement-list');
+    if (!list) return;
+
+    list.insertAdjacentHTML('beforeend', createComplementHTML(uid));
+    const row = list.lastElementChild;
+    if (!row) return;
+
+    const setValue = (selector, value) => {
+      const input = row.querySelector(selector);
+      if (input) input.value = value;
+    };
+
+    setValue(`#comp-name-${uid}`, item?.name || '');
+    setValue(`#comp-price-${uid}`, centsToMask(item?.unit_price || 0));
+    setValue(`#comp-qty-${uid}`, Number(item?.max_per_item || 0));
+    setValue(`#comp-desc-${uid}`, item?.description || '');
   }
 
   // === Carregar grupos+itens na EDIÇÃO ===
