@@ -1665,6 +1665,11 @@ window.__COMPL = {
 
     const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
 
+    if (!cards.length) {
+      console.log('[SAVE GROUPS] no categories found; links cleared only');
+      return;
+    }
+
     for (let i = 0; i < cards.length; i++) {
       const cardEl = cards[i];
       const uid = cardEl.getAttribute('data-uid') || '';
@@ -1812,6 +1817,15 @@ window.__COMPL = {
       }
       if (!name || !catId) {
         throw new Error('Preencha nome e categoria.');
+      }
+
+      // força leitura atualizada da querystring antes de assumir criação
+      if (!PRODUCT_ID) {
+        const qs = new URLSearchParams(window.location.search || '');
+        const pidFromQuery = (qs.get('product_id') || qs.get('id') || qs.get('pid') || '').trim();
+        if (pidFromQuery) {
+          PRODUCT_ID = pidFromQuery;
+        }
       }
 
       // se o badge de modo já tiver o PRODUCT_ID, reaproveita
