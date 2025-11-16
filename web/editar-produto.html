@@ -690,7 +690,7 @@ function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
 }
 
 
-function renderModifierRow(cardEl, { name, unit_price, description, max_per_item, sort_order }) {
+function renderModifierRow(cardEl, { name, unit_price, description, sort_order }) {
   const uniqueId = `comp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const list = cardEl.querySelector('.complement-list');
   if (!list) return;
@@ -700,7 +700,6 @@ function renderModifierRow(cardEl, { name, unit_price, description, max_per_item
   const row = list.lastElementChild;
   row.querySelector(`#comp-name-${uniqueId}`).value  = name || '';
   row.querySelector(`#comp-price-${uniqueId}`).value = toBRLStringFromNumber(unit_price || 0);
-  row.querySelector(`#comp-qty-${uniqueId}`).value   = Number(max_per_item || 0);
   row.querySelector(`#comp-desc-${uniqueId}`).value  = description || '';
 }
 
@@ -828,8 +827,8 @@ function createCategoryHTML(uniqueId) {
           function createComplementHTML(uniqueId) {
             return `
               <div class="p-3 bg-surface-2 rounded-lg border border-border">
-                <!-- Linha 1: Nome, Preço, Qtd. Máx, Ações -->
-                <div class="grid grid-cols-[5fr_3fr_3fr_1fr] items-center gap-4">
+                <!-- Linha 1: Nome, Preço e Ações -->
+                <div class="grid grid-cols-[5fr_3fr_1fr] items-center gap-4">
                   <!-- Nome (Input) -->
                   <div class="col-span-5">
                     <label class="sr-only" for="comp-name-${uniqueId}">Nome</label>
@@ -845,12 +844,6 @@ function createCategoryHTML(uniqueId) {
                         class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"
                         oninput="formatCurrencyInput(this)" onblur="formatCurrencyBlur(this)"/>
                     </div>
-                  </div>
-                  <!-- Qtd. Máx (Input) -->
-                  <div class="col-span-3">
-                    <label class="sr-only" for="comp-qty-${uniqueId}">Qtd. Máx</label>
-                    <input id="comp-qty-${uniqueId}" type="number" placeholder="Qtd. Máx" value="1" min="0"
-                      class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"/>
                   </div>
                   <!-- Ações (Deletar) -->
                   <div class="col-span-1 flex justify-end">
@@ -1561,7 +1554,7 @@ await (window.__COMPL?.loadGroupsForProduct?.());
     const list = cardEl.querySelector('.complement-list'); if (!list) return;
     list.insertAdjacentHTML('beforeend', `
       <div class="p-3 bg-surface-2 rounded-lg border border-border">
-        <div class="grid grid-cols-[5fr_3fr_3fr_1fr] items-center gap-4">
+        <div class="grid grid-cols-[5fr_3fr_1fr] items-center gap-4">
           <div class="col-span-5">
             <input id="comp-name-${uid}" type="text" placeholder="Nome do Complemento"
               class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"
@@ -1573,10 +1566,6 @@ await (window.__COMPL?.loadGroupsForProduct?.());
               <input id="comp-price-${uid}" type="text" placeholder="0,00" value="${centsToMask(item?.unit_price||0)}"
                 class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 text-text-primary text-sm"/>
             </div>
-          </div>
-          <div class="col-span-3">
-            <input id="comp-qty-${uid}" type="number" min="0" value="${Number(item?.max_per_item||0)}"
-              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"/>
           </div>
           <div class="col-span-1 flex justify-end">
             <button class="text-danger hover:text-danger-hover transition p-1 delete-complement-btn">
@@ -1780,7 +1769,6 @@ window.__COMPL = {
       const $name = rowEl.querySelector('input[id^="comp-name-"]');
       const $price= rowEl.querySelector('input[id^="comp-price-"]');
       const $desc = rowEl.querySelector('textarea[id^="comp-desc-"]');
-      const $qty  = rowEl.querySelector('input[id^="comp-qty-"]');
 
       const name = ($name?.value || '').trim();
       if (!name) return;
@@ -1791,7 +1779,7 @@ window.__COMPL = {
         name,
         unit_price    : maskToNumber($price?.value || '0'),
         description   : ($desc?.value || '').trim() || null,
-        max_per_item  : parseInt(($qty?.value || '0'),10) || 0,
+        max_per_item  : 0,
         sort_order    : idx + 1
       });
     });
