@@ -1634,8 +1634,11 @@ window.__COMPL = {
 };
 
   // === Salvar categorias (grupos) do produto ===
-  async function saveGroupsForProduct() {
-    if (!RESTAURANT_ID || !PRODUCT_ID) {
+  async function saveGroupsForProduct(forceProductId) {
+    const productId = forceProductId || PRODUCT_ID || window.__EDITOR_CTX__?.PRODUCT_ID || '';
+    const restaurantId = RESTAURANT_ID || window.__EDITOR_CTX__?.RESTAURANT_ID || '';
+
+    if (!restaurantId || !productId) {
       throw new Error('Sem PRODUCT_ID para salvar grupos.');
     }
 
@@ -1646,20 +1649,15 @@ window.__COMPL = {
       return String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
     };
 
-    const { error: delError } = await db
-      .from(TABLE_TREE)
-      .delete()
-      .eq(TREE_COLS.product, PRODUCT_ID)
-      .eq(TREE_COLS.restaurant, RESTAURANT_ID);
-    if (delError) throw delError;
+    const { data: existingGroups, error: existingErr } = await db
+      .from(TABLE_GROUPS)
+      .select('id')
+      .eq('product_id', productId);
+    if (existingErr) throw existingErr;
+    const existingIds = (existingGroups || []).map(g => g.id).filter(Boolean);
 
     const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
-    const upsertPayload = [];
-    const out = [];
-    const seenLinks = new Set();
-
-    for (let i = 0; i < cards.length; i++) {
-      const cardEl = cards[i];
+    const parsedCards = cards.map((cardEl) => {
       const uid = cardEl.getAttribute('data-uid') || '';
       const safeUid = escapeId(uid);
       const $t = cardEl.querySelector(`#category-name-${safeUid}`);
@@ -1673,55 +1671,87 @@ window.__COMPL = {
       if (!title) throw new Error('Informe o nome da categoria.');
       if (max < min) throw new Error('Na categoria, Máxima deve ser ≥ Mínima.');
 
-      let groupId = cardEl.getAttribute('data-group-id');
+      return {
+        cardEl,
+        title,
+        min,
+        max,
+        groupId: cardEl.getAttribute('data-group-id') || ''
+      };
+    });
 
-      if (!groupId) {
+    const { error: delLinksError } = await db
+      .from(TABLE_TREE)
+      .delete()
+      .eq(TREE_COLS.product, productId)
+      .eq(TREE_COLS.restaurant, restaurantId);
+    if (delLinksError) throw delLinksError;
+
+    const keepIds = new Set();
+    const upsertPayload = [];
+    const out = [];
+
+    for (let i = 0; i < parsedCards.length; i++) {
+      const cardData = parsedCards[i];
+      let groupId = cardData.groupId;
+
+      if (groupId) {
+        keepIds.add(groupId);
+        const { error: updError } = await db
+          .from(TABLE_GROUPS)
+          .update({
+            title: cardData.title,
+            name: cardData.title,
+            sort_order: i + 1,
+          })
+          .eq('id', groupId)
+          .eq('product_id', productId);
+        if (updError) throw updError;
+      } else {
         const ins = await db
           .from(TABLE_GROUPS)
           .insert({
-            restaurant_id: RESTAURANT_ID,
-            product_id: PRODUCT_ID,
-            title,
-            name: title,
+            restaurant_id: restaurantId,
+            product_id: productId,
+            title: cardData.title,
+            name: cardData.title,
             sort_order: i + 1,
           })
           .select('id')
           .single();
         if (ins.error) throw ins.error;
         groupId = ins.data.id;
-        cardEl.setAttribute('data-group-id', groupId);
+        cardData.cardEl.setAttribute('data-group-id', groupId);
+        cardData.groupId = groupId;
+        keepIds.add(groupId);
       }
 
-      if (seenLinks.has(groupId)) {
-        const uniqueTitle = `${title} ${Math.random().toString(36).slice(2, 5)}`;
-        const insDup = await db
-          .from(TABLE_GROUPS)
-          .insert({
-            restaurant_id: RESTAURANT_ID,
-            product_id: PRODUCT_ID,
-            title: uniqueTitle,
-            name: uniqueTitle,
-            sort_order: i + 1,
-          })
-          .select('id')
-          .single();
-        if (insDup.error) throw insDup.error;
-        groupId = insDup.data.id;
-        cardEl.setAttribute('data-group-id', groupId);
-      }
-
-      seenLinks.add(groupId);
       upsertPayload.push({
-        restaurant_id: RESTAURANT_ID,
-        product_id: PRODUCT_ID,
+        restaurant_id: restaurantId,
+        product_id: productId,
         group_id: groupId,
-        min_qty: min,
-        max_qty: max,
-        is_required: min >= 1,
+        min_qty: cardData.min,
+        max_qty: cardData.max,
+        is_required: cardData.min >= 1,
         sort_order: i + 1,
       });
 
-      out.push({ groupId, cardEl });
+      out.push({ groupId, cardEl: cardData.cardEl });
+    }
+
+    const toDelete = existingIds.filter(id => !keepIds.has(id));
+    if (toDelete.length) {
+      const { error: delItemsErr } = await db
+        .from(TABLE_ITEMS)
+        .delete()
+        .in('group_id', toDelete);
+      if (delItemsErr) throw delItemsErr;
+
+      const { error: delGroupsErr } = await db
+        .from(TABLE_GROUPS)
+        .delete()
+        .in('id', toDelete);
+      if (delGroupsErr) throw delGroupsErr;
     }
 
     if (upsertPayload.length) {
@@ -1826,7 +1856,12 @@ window.__COMPL = {
       if (!PRODUCT_ID) throw new Error('Falha ao criar o produto antes de salvar os complementos.');
 
       // salva categorias e itens
-      const groups = await saveGroupsForProduct();
+      const currentProductId = PRODUCT_ID || window.__EDITOR_CTX__?.PRODUCT_ID || '';
+      if (!currentProductId) {
+        throw new Error('Sem PRODUCT_ID para salvar grupos.');
+      }
+
+      const groups = await saveGroupsForProduct(currentProductId);
       for (const g of groups) await saveModifiersForGroup(g.groupId, g.cardEl);
 
       alert('Produto salvo com complementos.');
