@@ -1493,10 +1493,11 @@ await (window.__COMPL?.loadGroupsForProduct?.());
   // === Contexto (pega por querystring e/ou path) ===
   function getFromPath(regex){ const m = location.pathname.match(regex); return m ? m[1] : ''; }
   const qs = new URLSearchParams(location.search);
-  const RESTAURANT_ID = (window.RESTAURANT_ID || qs.get('restaurant_id') || '').trim()
+  const ctx = window.__EDITOR_CTX__ || {};
+  const RESTAURANT_ID = (window.RESTAURANT_ID || qs.get('restaurant_id') || ctx.RESTAURANT_ID || '').trim()
                       || sessionStorage.getItem('RESTAURANT_ID') || getFromPath(/\/restaurante\/([^\/?#]+)/i) || '';
-  let   PRODUCT_ID    = qs.get('product_id') || getFromPath(/editar-produto\/([^\/?#]+)/i) || '';
-  const CATEGORY_ID   = qs.get('category_id') || '';
+  let   PRODUCT_ID    = qs.get('product_id') || getFromPath(/editar-produto\/([^\/?#]+)/i) || ctx.PRODUCT_ID || '';
+  const CATEGORY_ID   = qs.get('category_id') || ctx.CATEGORY_ID || '';
 
   // === Tabelas (seu schema) ===
   const TABLE_PRODUCTS = 'products';
@@ -1810,6 +1811,10 @@ window.__COMPL = {
 
     try {
       // cria produto se for novo (mandando SLUG)
+      if (!PRODUCT_ID && window.__EDITOR_CTX__?.PRODUCT_ID) {
+        PRODUCT_ID = window.__EDITOR_CTX__.PRODUCT_ID;
+      }
+
       if (!PRODUCT_ID) {
         const name  = (document.getElementById('product-name')?.value || '').trim();
         const desc  = (document.getElementById('product-description')?.value || '').trim();
@@ -1851,6 +1856,9 @@ window.__COMPL = {
 
         if (insP.error) throw insP.error;
         PRODUCT_ID = insP.data.id;
+        if (window.__EDITOR_CTX__) {
+          window.__EDITOR_CTX__.PRODUCT_ID = PRODUCT_ID;
+        }
       }
 
       if (!PRODUCT_ID) throw new Error('Falha ao criar o produto antes de salvar os complementos.');
