@@ -726,8 +726,22 @@ const PRODUCT_EDITOR_URL = 'https://www.insightsdelivery.com.br/tela-produto-app
             const results = await Promise.all(productPromises);
             let html = '';
             for(let i=0;i<catData.length;i++){
-              const prods = results[i].error ? [] : results[i].data;
-              html += renderCategoryBlock(catData[i], prods);
+              const rawProds = results[i].error ? [] : (results[i].data || []);
+              const seen = new Set();
+              const deduped = [];
+              rawProds.forEach((prod) => {
+                if (!prod || seen.has(prod.id)) return;
+                seen.add(prod.id);
+                deduped.push(prod);
+              });
+              if (rawProds.length !== deduped.length) {
+                console.warn('[Menu] Produtos duplicados removidos', {
+                  categoryId: catData[i].id,
+                  total: rawProds.length,
+                  uniques: deduped.length
+                });
+              }
+              html += renderCategoryBlock(catData[i], deduped);
             }
             categoryListContainer.innerHTML = html;
 
