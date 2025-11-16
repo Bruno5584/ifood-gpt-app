@@ -853,23 +853,57 @@ function createCategoryHTML(uniqueId) {
     if (window.__modeBannerInit) return;
     window.__modeBannerInit = true;
 
-    function getParam(possibleKeys) {
-      const url = new URL(window.location.href);
-      for (const k of possibleKeys) {
-        const v = url.searchParams.get(k);
-        if (v) return v;
+    function readContextFromUrl() {
+      try {
+        const url = new URL(window.location.href);
+        const params = url.searchParams;
+        const pick = (keys) => {
+          for (const key of keys) {
+            const value = params.get(key);
+            if (value) return value;
+          }
+          return '';
+        };
+
+        let productId = pick(['product_id', 'id', 'pid']);
+        if (!productId) {
+          const m = url.pathname.match(/editar-produto\/([^/?#]+)/i);
+          productId = m ? m[1] : '';
+        }
+
+        return {
+          productId,
+          categoryId: pick(['category_id', 'cid']),
+          restaurantId: pick(['restaurant_id', 'rid'])
+        };
+      } catch (err) {
+        console.error('[Editor] Não foi possível ler os parâmetros da URL:', err);
+        return { productId: '', categoryId: '', restaurantId: '' };
       }
-      // fallback: /editar-produto/<product_id>
-      const m = location.pathname.match(/editar-produto\/([^/?#]+)/i);
-      return m ? m[1] : '';
     }
 
-    function init() {
-      const PRODUCT_ID    = getParam(['product_id','id','pid']);
-      const CATEGORY_ID   = getParam(['category_id','cid']);
-      const RESTAURANT_ID = getParam(['restaurant_id','rid']);
+    function resolveEditorContext() {
+      const existingCtx = window.__EDITOR_CTX__ || window.EDITOR_CTX || {};
+      const urlCtx = readContextFromUrl();
 
-      window.__EDITOR_CTX__ = { PRODUCT_ID, CATEGORY_ID, RESTAURANT_ID };
+      const resolved = {
+        PRODUCT_ID: existingCtx.PRODUCT_ID || urlCtx.productId || '',
+        CATEGORY_ID: existingCtx.CATEGORY_ID || urlCtx.categoryId || '',
+        RESTAURANT_ID:
+          existingCtx.RESTAURANT_ID || window.RESTAURANT_ID || urlCtx.restaurantId || ''
+      };
+
+      const nextCtx = { ...existingCtx, ...resolved };
+      window.__EDITOR_CTX__ = nextCtx;
+      return nextCtx;
+    }
+
+    window.__resolveEditorContext = resolveEditorContext;
+
+    function init() {
+      const ctx = resolveEditorContext();
+      const PRODUCT_ID = ctx.PRODUCT_ID;
+      const CATEGORY_ID = ctx.CATEGORY_ID;
 
       const mode = PRODUCT_ID ? 'edit' : 'create';
 
@@ -1185,9 +1219,11 @@ const TABLE_CATEGORIES = 'categories';
 
   // 3) Pega contexto (unificado, lendo do global)
   //    [CORREÇÃO APLICADA]
-  const ctx = window.__EDITOR_CTX__ || {};
+  const ctx = (typeof window.__resolveEditorContext === 'function')
+    ? window.__resolveEditorContext()
+    : (window.__EDITOR_CTX__ || window.EDITOR_CTX || {});
   // `window.RESTAURANT_ID` é definido pelo script na linha 389
-  const RESTAURANT_ID = window.RESTAURANT_ID || ctx.RESTAURANT_ID || '';
+  const RESTAURANT_ID = ctx.RESTAURANT_ID || window.RESTAURANT_ID || '';
   // `ctx.PRODUCT_ID` é definido pelo script 'Badge' na linha 787
   const PRODUCT_ID    = ctx.PRODUCT_ID || '';
   const CATEGORY_ID   = ctx.CATEGORY_ID || '';
@@ -1371,12 +1407,13 @@ async function loadProductIfEdit(){
 
   // === Contexto (lê do contexto global, definido por outros scripts) ===
   // [CORREÇÃO APLICADA]
-  const ctx = window.__EDITOR_CTX__ || {};
+  const ctx = (typeof window.__resolveEditorContext === 'function')
+    ? window.__resolveEditorContext()
+    : (window.__EDITOR_CTX__ || window.EDITOR_CTX || {});
   // `window.RESTAURANT_ID` é definido pelo script na linha 389
-  const RESTAURANT_ID = window.RESTAURANT_ID || ctx.RESTAURANT_ID || '';
-  // `ctx.PRODUCT_ID` é definido pelo script 'Badge' na linha 787
+  const RESTAURANT_ID = ctx.RESTAURANT_ID || window.RESTAURANT_ID || '';
   // 'let' é importante aqui, pois handleSaveClick (criação) atualiza este valor
-  let   PRODUCT_ID    = ctx.PRODUCT_ID || ''; 
+  let   PRODUCT_ID    = ctx.PRODUCT_ID || '';
   const CATEGORY_ID   = ctx.CATEGORY_ID || '';
   console.log('[COMPLEMENTS PATCH] Contexto unificado:', { RESTAURANT_ID, PRODUCT_ID });
   // [FIM DA CORREÇÃO]
@@ -1420,6 +1457,7 @@ async function loadProductIfEdit(){
     
     const cardEl = container.lastElementChild;
     if (!cardEl) return { uid: null, cardEl: null };
+    cardEl.setAttribute('data-uid', uid);
 
     // 2. Seta o ID do banco (para a lógica de salvar)
     if (groupId) {
@@ -1465,7 +1503,10 @@ async function loadProductIfEdit(){
 
     const rowEl = list.lastElementChild;
     if (!rowEl) return;
-    
+    if (item?.id) {
+      rowEl.setAttribute('data-modifier-id', item.id);
+    }
+
     // 2. Preenche os valores
     const $name = rowEl.querySelector(`#comp-name-${uid}`);
     const $price = rowEl.querySelector(`#comp-price-${uid}`);
@@ -1473,7 +1514,13 @@ async function loadProductIfEdit(){
 
     if ($name) $name.value = item?.name || '';
     // Usa o helper 'centsToMask' que já está neste script
-    if ($price) $price.value = centsToMask(item?.unit_price || 0); 
+    if ($price) {
+      const priceValue = Number(item?.unit_price ?? item?.price ?? 0);
+      $price.value = centsToMask(priceValue);
+      if (typeof formatCurrencyBlur === 'function') {
+        formatCurrencyBlur($price);
+      }
+    }
     if ($desc) $desc.value = item?.description || '';
   }
 
@@ -1482,133 +1529,114 @@ async function loadProductIfEdit(){
    * Carrega grupos e itens do Supabase, com fallbacks.
    */
   async function loadGroupsForProduct() {
-    // 1. Guardas (Usa o PRODUCT_ID unificado deste escopo)
     if (!PRODUCT_ID) {
       console.warn('[Editor] loadGroupsForProduct: PRODUCT_ID está vazio. Saindo.');
       return;
     }
-    // (Usa o RESTAURANT_ID unificado deste escopo)
-    
-    const box = document.getElementById('category-list-container');
-    if (box) box.innerHTML = ''; // Limpa container
 
-    try {
-      // --- FLUXO 1: Tentar via product_groups (Vínculos) ---
-      let linksQuery = db
+    const box = document.getElementById('category-list-container');
+    if (box) box.innerHTML = '';
+
+    const loadItemsForGroup = async (groupId, cardEl) => {
+      if (!groupId || !cardEl) return;
+      const { data: items, error } = await db
+        .from(TABLE_ITEMS)
+        .select('id,name,unit_price,description,sort_order')
+        .eq('group_id', groupId)
+        .order('sort_order', { ascending: true, nullsLast: true });
+      if (error) {
+        console.error(`[Editor] Erro ao carregar itens do grupo ${groupId}:`, error);
+        return;
+      }
+      (items || []).forEach((item) => renderModifierRow(cardEl, item));
+    };
+
+    const renderLinks = async (links) => {
+      for (const link of links) {
+        if (!link || !link.modifier_groups) {
+          console.warn('[Editor] Vínculo sem modifier_groups correspondente. Pulando.', link);
+          continue;
+        }
+        const groupData = link.modifier_groups;
+        const { cardEl } = renderGroupCard({
+          name: groupData.title ?? groupData.name ?? '(sem nome)',
+          min_qty: link.min_qty ?? groupData.min_qty ?? 0,
+          max_qty: link.max_qty ?? groupData.max_qty ?? 1,
+          groupId: groupData.id || link.group_id
+        });
+        if (!cardEl) continue;
+        await loadItemsForGroup(groupData.id || link.group_id, cardEl);
+      }
+    };
+
+    const fetchProductGroups = async (withRestaurant) => {
+      let query = db
         .from(TABLE_TREE)
         .select(`
           group_id, min_qty, max_qty, is_required, sort_order,
-          modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
+          modifier_groups:${TABLE_GROUPS}( id, title, name, min_qty, max_qty )
         `)
         .eq(TREE_COLS.product, PRODUCT_ID)
-        .order(TREE_COLS.sort, { ascending: true });
-
-      // Adiciona filtro de restaurant_id SE ele existir
-      if (RESTAURANT_ID) {
-        linksQuery = linksQuery.eq(TREE_COLS.restaurant, RESTAURANT_ID);
+        .order(TREE_COLS.sort, { ascending: true, nullsLast: true });
+      if (withRestaurant && RESTAURANT_ID) {
+        query = query.eq(TREE_COLS.restaurant, RESTAURANT_ID);
       }
-
-      let { data: links, error } = await linksQuery;
-
-      // Fallback 1.1 (se não veio nada, tenta SÓ com product_id, sem restaurant_id)
-      if (RESTAURANT_ID && (!links || links.length === 0)) {
-        console.log('[Editor] loadGroupsForProduct: product_groups vazio. Tentando fallback sem restaurant_id...');
-        let { data: fallbackLinks, error: fallbackError } = await db
-          .from(TABLE_TREE)
-          .select(`
-            group_id, min_qty, max_qty, is_required, sort_order,
-            modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
-          `)
-          .eq(TREE_COLS.product, PRODUCT_ID)
-          //.is(TREE_COLS.restaurant, null) // Alternativa: buscar só os antigos
-          .order(TREE_COLS.sort, { ascending: true });
-        
-        links = fallbackLinks; // Usa os links do fallback
-        error = fallbackError;
+      const { data, error } = await query;
+      if (error) {
+        console.error('[Editor] Erro ao buscar product_groups:', error);
+        throw error;
       }
+      return data || [];
+    };
 
-      if (error) { throw new Error(`Erro ao buscar product_groups: ${error.message}`); }
-
-      // SE ENCONTROU VÍNCULOS, processa e sai
-      if (links && links.length > 0) {
-        console.log(`[Editor] Carregando ${links.length} grupos via product_groups (Vínculos)`);
-        for (const l of links) {
-          if (!l.modifier_groups) {
-             console.warn(`[Editor] Vínculo encontrado (group_id ${l.group_id}) mas o grupo não existe em modifier_groups. Pulando.`);
-             continue;
-          }
-          const groupTitle = l.modifier_groups.title ?? l.modifier_groups.name ?? '(sem nome)';
-          const { cardEl } = renderGroupCard({
-            name: groupTitle,
-            min_qty: l.min_qty,
-            max_qty: l.max_qty,
-            groupId: l.group_id
-          });
-
-          if (!cardEl) continue;
-
-          const { data: items } = await db
-            .from(TABLE_ITEMS)
-            .select('id,name,unit_price,description,max_per_item,sort_order')
-            .eq('group_id', l.group_id)
-            .order('sort_order', { ascending: true, nullsLast: true });
-
-          (items || []).forEach(it => renderModifierRow(cardEl, it));
-        }
-        return; // Fim do Fluxo 1
-      }
-
-      // --- FLUXO 2: Fallback via modifier_groups (direto) ---
-      // (Só chega aqui se 'links' estiver vazio)
-      console.warn(`[Editor] Fallback: carregando grupos direto de modifier_groups (product_id: ${PRODUCT_ID})`);
-
-      let groupsQuery = db
+    const fetchModifierGroups = async (withRestaurant) => {
+      let query = db
         .from(TABLE_GROUPS)
-        .select('id, title, name, sort_order')
+        .select('id, title, name, min_qty, max_qty, sort_order')
         .eq('product_id', PRODUCT_ID)
-        .order('sort_order', { ascending: true });
-
-      if (RESTAURANT_ID) {
-        groupsQuery = groupsQuery.eq('restaurant_id', RESTAURANT_ID);
+        .order('sort_order', { ascending: true, nullsLast: true });
+      if (withRestaurant && RESTAURANT_ID) {
+        query = query.eq('restaurant_id', RESTAURANT_ID);
       }
-      
-      let { data: groups, error: groupsError } = await groupsQuery;
+      const { data, error } = await query;
+      if (error) {
+        console.error('[Editor] Erro ao buscar modifier_groups:', error);
+        throw error;
+      }
+      return data || [];
+    };
 
-      // Fallback 2.1 (se não veio nada, tenta SÓ com product_id)
-      if (RESTAURANT_ID && (!groups || groups.length === 0)) {
-         console.log('[Editor] loadGroupsForProduct: modifier_groups vazio. Tentando fallback sem restaurant_id...');
-         let { data: fallbackGroups, error: fallbackGroupsError } = await db
-          .from(TABLE_GROUPS)
-          .select('id, title, name, sort_order')
-          .eq('product_id', PRODUCT_ID)
-          .order('sort_order', { ascending: true });
-        
-        groups = fallbackGroups;
-        groupsError = fallbackGroupsError;
+    console.log('[Editor] Carregando grupos via product_groups...', { PRODUCT_ID, RESTAURANT_ID });
+
+    try {
+      let links = await fetchProductGroups(true);
+
+      if ((!links || links.length === 0) && RESTAURANT_ID) {
+        console.log('[Editor] Nenhum vínculo com restaurant_id. Tentando sem filtro...');
+        links = await fetchProductGroups(false);
       }
 
-      if (groupsError) { throw new Error(`Erro no fallback de modifier_groups: ${groupsError.message}`); }
+      if (links && links.length) {
+        await renderLinks(links);
+        return;
+      }
 
-      if (groups && groups.length > 0) {
-        console.log(`[Editor] Fallback: Carregando ${groups.length} grupos...`);
-        for (const g of groups) {
-          const { cardEl } = renderGroupCard({
-            name: g.title ?? g.name,
-            min_qty: 0, // Default
-            max_qty: 1, // Default
-            groupId: g.id
-          });
+      console.warn('[Editor] Fallback: carregando grupos direto de modifier_groups.');
+      let groups = await fetchModifierGroups(true);
+      if ((!groups || groups.length === 0) && RESTAURANT_ID) {
+        console.log('[Editor] Nenhum modifier_group com restaurant_id. Tentando sem filtro...');
+        groups = await fetchModifierGroups(false);
+      }
 
-          if (!cardEl) continue;
-
-          const { data: items } = await db
-            .from(TABLE_ITEMS)
-            .select('id,name,unit_price,description,max_per_item,sort_order')
-            .eq('group_id', g.id)
-            .order('sort_order', { ascending: true, nullsLast: true });
-
-          (items || []).forEach(it => renderModifierRow(cardEl, it));
-        }
+      for (const group of groups || []) {
+        const { cardEl } = renderGroupCard({
+          name: group.title ?? group.name ?? '(sem nome)',
+          min_qty: group.min_qty ?? 0,
+          max_qty: group.max_qty ?? 1,
+          groupId: group.id
+        });
+        if (!cardEl) continue;
+        await loadItemsForGroup(group.id, cardEl);
       }
     } catch (err) {
       console.error('[Editor] Falha total ao carregar complementos:', err);
