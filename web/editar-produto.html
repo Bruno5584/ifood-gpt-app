@@ -641,116 +641,12 @@
           });
       
           // === FUNÇÕES HELPER PARA COMPLEMENTOS ===
-     // BEGIN:RENDER_HELPERS
-function toBRLStringFromNumber(vNum){
-  const cents = Math.round((Number(vNum) || 0) * 100);
-  return (window.__price?.formatFromDigits?.(String(cents))) || '0,00';
-}
-
-function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
-  const uid = `cat-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-  const container = document.getElementById('category-list-container');
-  if (!container) return { uid:null, cardEl:null };
-  const html = `
-    <div class="bg-surface-1 border border-border rounded-lg p-4"
-         data-uid="${uid}"
-         ${groupId ? `data-group-id="${groupId}"` : ''}>
-      <div class="flex justify-between items-center mb-4 gap-4">
-        <div class="flex-1">
-          <input id="category-name-${uid}" type="text" value="${(name||'Nova Categoria')}"
-            class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary w-full"/>
-        </div>
-        <div class="flex items-center gap-2">
-          <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
-            <span class="material-icons-outlined">delete</span>
-          </button>
-        </div>
-      </div>
-      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-        <div class="flex items-end gap-3">
-          <div>
-            <label class="block text-xs text-text-secondary mb-1">Qtd. Mínima</label>
-            <input id="category-min-${uid}" type="number" min="0" value="${Number(min_qty||0)}"
-                   class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-          </div>
-          <div>
-            <label class="block text-xs text-text-secondary mb-1">Qtd. Máxima</label>
-            <input id="category-max-${uid}" type="number" min="0" value="${Number(max_qty||1)}"
-                   class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-          </div>
-        </div>
-        <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm add-complement-btn">
-          <span class="material-icons-outlined text-base">add</span>Adicionar Complemento
-        </button>
-      </div>
-      <div class="space-y-3 complement-list"></div>
-    </div>`;
-  container.insertAdjacentHTML('beforeend', html);
-  return { uid, cardEl: container.lastElementChild };
-}
-
-
-function renderModifierRow(cardEl, { name, unit_price, description, sort_order }) {
-  const uniqueId = `comp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-  const list = cardEl.querySelector('.complement-list');
-  if (!list) return;
-
-  list.insertAdjacentHTML('beforeend', createComplementHTML(uniqueId));
-
-  const row = list.lastElementChild;
-  row.querySelector(`#comp-name-${uniqueId}`).value  = name || '';
-  row.querySelector(`#comp-price-${uniqueId}`).value = toBRLStringFromNumber(unit_price || 0);
-  row.querySelector(`#comp-desc-${uniqueId}`).value  = description || '';
-}
-
-/** Busca vínculos do produto e seus grupos + itens */
-async function loadGroupsForProduct(db, RESTAURANT_ID, productId){
-  const out = [];
-
-  const { data: links, error: linkErr } = await db
-    .from(TABLE_TREE)
-    .select(`
-      group_id,
-      min_qty,
-      max_qty,
-      is_required,
-      sort_order,
-      modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
-
-    `)
-    .eq(TREE_COLS.restaurant, RESTAURANT_ID)
-    .eq(TREE_COLS.product, productId)
-    .order(TREE_COLS.sort, { ascending: true });
-
-  if (linkErr) throw linkErr;
-  if (!links?.length) return out;
-
-  for (const l of links) {
-    const g = l.modifier_groups || {};
-    const groupTitle = g?.title || '(sem nome)';
-
-    const { cardEl } = renderGroupCard({
-      name: groupTitle,
-      min_qty: l.min_qty,
-      max_qty: l.max_qty
-    });
-
-    const { data: items, error: itemsErr } = await db
-      .from(TABLE_ITEMS)
-      .select('id,name,unit_price,description,max_per_item,sort_order')
-      .eq('group_id', l.group_id)
-      .order('sort_order', { ascending: true, nullsLast: true });
-
-    if (itemsErr) throw itemsErr;
-    (items || []).forEach(it => renderModifierRow(cardEl, it));
-
-    out.push({ groupId: l.group_id, cardEl });
-  }
-
-  return out;
-}
-// END:RENDER_HELPERS
-
+     /* O bloco <script> que estava aqui (linhas 539 a 604, marcado com BEGIN:RENDER_HELPERS)
+       foi removido para eliminar as funções duplicadas 'renderGroupCard', 
+       'renderModifierRow' e 'loadGroupsForProduct'.
+       A versão correta dessas funções já existe no "COMPLEMENTS PATCH START".
+     */
+          
           /**
            * Cria o HTML para um novo CARD DE CATEGORIA
            */
@@ -1287,25 +1183,16 @@ const TABLE_CATEGORIES = 'categories';
       .replace(/\-\-+/g,'-').replace(/^-+/, '').replace(/-+$/, '');
   }
 
-  // 3) Pega contexto via URL (com fallbacks iguais ao restante da página)
-function getFromPath(regex){
-  const m = location.pathname.match(regex);
-  return m ? m[1] : '';
-}
-
-const RESTAURANT_ID =
-  (window.RESTAURANT_ID || '').trim() ||
-  qp('restaurant_id') ||
-  sessionStorage.getItem('RESTAURANT_ID') ||
-  getFromPath(/\/restaurante\/([^\/?#]+)/i) || // se você usar esse padrão em outra rota, ajuste
-  '';
-
-const PRODUCT_ID =
-  qp('product_id') ||
-  getFromPath(/editar-produto\/([^\/?#]+)/i) ||
-  '';
-
-const CATEGORY_ID = qp('category_id') || '';
+  // 3) Pega contexto (unificado, lendo do global)
+  //    [CORREÇÃO APLICADA]
+  const ctx = window.__EDITOR_CTX__ || {};
+  // `window.RESTAURANT_ID` é definido pelo script na linha 389
+  const RESTAURANT_ID = window.RESTAURANT_ID || ctx.RESTAURANT_ID || '';
+  // `ctx.PRODUCT_ID` é definido pelo script 'Badge' na linha 787
+  const PRODUCT_ID    = ctx.PRODUCT_ID || '';
+  const CATEGORY_ID   = ctx.CATEGORY_ID || '';
+  console.log('[Main Script] Contexto unificado:', { RESTAURANT_ID, PRODUCT_ID });
+  // [FIM DA CORREÇÃO]
 
 
 
@@ -1328,7 +1215,7 @@ const CATEGORY_ID = qp('category_id') || '';
     console.warn('[Editor] IDs obrigatórios não encontrados. Algumas funcionalidades Supabase serão desativadas.');
   }
 
-  /* === Carrega categorias do restaurante e prepara seleção === */
+  /* === [CORRIGIDO] Carrega categorias do restaurante e prepara seleção === */
 async function loadCategories() {
   const $catSel = document.getElementById('product-category');
   const $errCat = document.getElementById('cat-error');
@@ -1337,19 +1224,17 @@ async function loadCategories() {
   // limpa (mantém placeholder)
   $catSel.innerHTML = '<option value="" disabled selected hidden>Selecione uma categoria</option>';
 
-  // valida RESTAURANT_ID
-  const RESTAURANT_ID = (window.RESTAURANT_ID || new URL(location.href).searchParams.get('restaurant_id') || '').trim();
+  // valida RESTAURANT_ID (USA O DO ESCOPO, linha 1060)
   if (!RESTAURANT_ID) {
     console.warn('[Editor] Sem RESTAURANT_ID para carregar categorias.');
     return;
   }
 
-  // busca no Supabase
-  const { data, error } = await window.supabase
-    .createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  // busca no Supabase (USA O 'db' DO ESCOPO, linha 1080)
+  const { data, error } = await db // <-- CORRIGIDO
     .from(TABLE_CATEGORIES)
     .select('id,name')
-    .eq('restaurant_id', RESTAURANT_ID)
+    .eq('restaurant_id', RESTAURANT_ID) // <-- CORRIGIDO
     .order('sort_order', { ascending: true, nullsLast: true })
     .order('name', { ascending: true });
 
@@ -1369,10 +1254,9 @@ async function loadCategories() {
 
   // pré-seleção:
   // 1) se vier pela URL (adicionar produto) -> category_id
-  const qs = new URLSearchParams(location.search);
-  const cidFromURL = qs.get('category_id') || '';
-  if (cidFromURL && data.some(c => c.id === cidFromURL)) {
-    $catSel.value = cidFromURL;
+  //    [CORREÇÃO] Usa a constante CATEGORY_ID do escopo unificado
+  if (CATEGORY_ID && data.some(c => c.id === CATEGORY_ID)) {
+    $catSel.value = CATEGORY_ID;
   }
 
   // feedback de erro ao alterar
@@ -1385,6 +1269,7 @@ async function loadCategories() {
  // 7) Se for EDIÇÃO, carrega dados do produto
 // BEGIN:LOAD_GROUPS_IN_EDIT
 async function loadProductIfEdit(){
+  // Usa as constantes unificadas deste escopo
   if (!PRODUCT_ID || !RESTAURANT_ID) return;
 
   try{
@@ -1415,6 +1300,7 @@ async function loadProductIfEdit(){
     }
 
     window.__productActive = !!data.is_active;
+    // [CORREÇÃO] Esta linha agora funciona, pois 'loadCategories' (que é chamada ANTES) foi corrigida
     if ($catSel) $catSel.value = data.category_id || '';
 
     const h2 = document.getElementById('product-title');
@@ -1426,7 +1312,10 @@ async function loadProductIfEdit(){
     // Limpa UI anterior (se houver)
     const listContainer = document.getElementById('category-list-container');
     if (listContainer) listContainer.innerHTML = '';
-await (window.__COMPL?.loadGroupsForProduct?.());
+    
+    // [INFO] Esta chamada agora deve funcionar
+    console.log('[Editor] Produto base carregado. Chamando loadGroupsForProduct...');
+    await (window.__COMPL?.loadGroupsForProduct?.());
 
     
 
@@ -1452,11 +1341,8 @@ await (window.__COMPL?.loadGroupsForProduct?.());
     // 1) Carrega categorias
     loadCategories().then(() => { // CORREÇÃO: Usado .then()
   
-      // 2) Decide: edição x criação (suporta path)
-      const qs  = new URLSearchParams(location.search);
-      const pid = qs.get('product_id') || (location.pathname.match(/editar-produto\/([^\/?#]+)/i)?.[1] || '');
-  
-      if (pid) {
+      // 2) Decide: edição x criação (usa a constante do escopo)
+      if (PRODUCT_ID) { // <-- Usa a constante PRODUCT_ID definida neste escopo
         loadProductIfEdit().then(() => { // CORREÇÃO: Usado .then()
           // 3) Atualiza contadores (sempre)
           window.updateProductFormCounters && window.updateProductFormCounters();
@@ -1474,7 +1360,7 @@ await (window.__COMPL?.loadGroupsForProduct?.());
 
 <!-- COMPLEMENTS PATCH START -->
 <script>
-/*  =====  Editor de complementos – fluxo correto (async/await)  =====  */
+/* =====  Editor de complementos – fluxo correto (async/await)  =====  */
 (function () {
   // === Supabase (mesmas credenciais do projeto) ===
   const SUPABASE_URL = window.__ENV?.SUPABASE_URL || 'https://yrmvpocrkjkwhzfpwwmp.supabase.co';
@@ -1483,14 +1369,17 @@ await (window.__COMPL?.loadGroupsForProduct?.());
             : (window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null);
   if (!db) { console.error('[Editor] Supabase não disponível.'); return; }
 
-  // === Contexto (pega por querystring e/ou path) ===
-  function getFromPath(regex){ const m = location.pathname.match(regex); return m ? m[1] : ''; }
-  const qs = new URLSearchParams(location.search);
+  // === Contexto (lê do contexto global, definido por outros scripts) ===
+  // [CORREÇÃO APLICADA]
   const ctx = window.__EDITOR_CTX__ || {};
-  const RESTAURANT_ID = (window.RESTAURANT_ID || qs.get('restaurant_id') || ctx.RESTAURANT_ID || '').trim()
-                      || sessionStorage.getItem('RESTAURANT_ID') || getFromPath(/\/restaurante\/([^\/?#]+)/i) || '';
-  let   PRODUCT_ID    = qs.get('product_id') || getFromPath(/editar-produto\/([^\/?#]+)/i) || ctx.PRODUCT_ID || '';
-  const CATEGORY_ID   = qs.get('category_id') || ctx.CATEGORY_ID || '';
+  // `window.RESTAURANT_ID` é definido pelo script na linha 389
+  const RESTAURANT_ID = window.RESTAURANT_ID || ctx.RESTAURANT_ID || '';
+  // `ctx.PRODUCT_ID` é definido pelo script 'Badge' na linha 787
+  // 'let' é importante aqui, pois handleSaveClick (criação) atualiza este valor
+  let   PRODUCT_ID    = ctx.PRODUCT_ID || ''; 
+  const CATEGORY_ID   = ctx.CATEGORY_ID || '';
+  console.log('[COMPLEMENTS PATCH] Contexto unificado:', { RESTAURANT_ID, PRODUCT_ID });
+  // [FIM DA CORREÇÃO]
 
   // === Tabelas (seu schema) ===
   const TABLE_PRODUCTS = 'products';
@@ -1508,114 +1397,316 @@ await (window.__COMPL?.loadGroupsForProduct?.());
     return `${int},${c.slice(-2)}`;
   };
 
-  // === Renderização mínima de cards e linhas (reutiliza seu HTML já existente) ===
-  function renderGroupCard({ name, min_qty, max_qty }) {
-    const uid = `cat-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+  // === Renderização (Funções reescritas conforme solicitado) ===
+
+  /**
+   * [INFO] Esta função já estava correta, usando createCategoryHTML.
+   * Cria um card de categoria na UI, preenchendo os dados.
+   * Utiliza a função global 'createCategoryHTML' para o layout.
+   */
+  function renderGroupCard({ name, min_qty, max_qty, groupId }) {
     const container = document.getElementById('category-list-container');
-    if (!container) return { uid:null, cardEl:null };
-    const html = `
-      <div class="bg-surface-1 border border-border rounded-lg p-4" data-uid="${uid}">
-        <div class="flex justify-between items-center mb-4 gap-4">
-          <div class="flex-1">
-            <input id="category-name-${uid}" type="text" value="${(name||'Nova Categoria')}"
-              class="text-lg font-bold text-text-primary bg-transparent border-0 border-b-2 border-transparent p-0 focus:ring-0 focus:border-primary w-full"/>
-          </div>
-          <div class="flex items-center gap-2">
-            <button class="text-danger hover:text-danger-hover transition p-1 delete-category-btn" title="Excluir categoria">
-              <span class="material-icons-outlined">delete</span>
-            </button>
-          </div>
-        </div>
-        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-          <div class="flex items-end gap-3">
-            <div>
-              <label class="block text-xs text-text-secondary mb-1">Qtd. Mínima</label>
-              <input id="category-min-${uid}" type="number" min="0" value="${Number(min_qty||0)}"
-                     class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-            </div>
-            <div>
-              <label class="block text-xs text-text-secondary mb-1">Qtd. Máxima</label>
-              <input id="category-max-${uid}" type="number" min="0" value="${Number(max_qty||1)}"
-                     class="w-20 bg-surface-2 border border-border rounded-md py-1 px-2 text-text-primary text-sm"/>
-            </div>
-          </div>
-          <button class="bg-surface-2 border border-border text-text-primary font-medium py-2 px-4 rounded-md hover:bg-surface-1 transition flex items-center gap-2 text-sm add-complement-btn">
-            <span class="material-icons-outlined text-base">add</span>Adicionar Complemento
-          </button>
-        </div>
-        <div class="space-y-3 complement-list"></div>
-      </div>`;
+    if (!container) return { uid: null, cardEl: null };
+
+    const uid = `cat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // 1. Chama a função externa para criar o HTML base
+    if (typeof createCategoryHTML !== 'function') {
+      console.error('[Editor] renderGroupCard: createCategoryHTML() não foi encontrada. Verifique se o script está na página.');
+      return { uid: null, cardEl: null };
+    }
+    const html = createCategoryHTML(uid);
     container.insertAdjacentHTML('beforeend', html);
-    return { uid, cardEl: container.lastElementChild };
+    
+    const cardEl = container.lastElementChild;
+    if (!cardEl) return { uid: null, cardEl: null };
+
+    // 2. Seta o ID do banco (para a lógica de salvar)
+    if (groupId) {
+      cardEl.setAttribute('data-group-id', groupId);
+    }
+
+    // 3. Preenche os valores
+    const $title = cardEl.querySelector(`#category-name-${uid}`);
+    const $min   = cardEl.querySelector(`#category-min-${uid}`);
+    const $max   = cardEl.querySelector(`#category-max-${uid}`);
+
+    if ($title) $title.value = name || 'Nova categoria';
+    if ($min) {
+      $min.value = Number(min_qty ?? 0);
+      // 4. Chama helper de badge (essencial)
+      if (typeof updateCategoryMinStatus === 'function') {
+        updateCategoryMinStatus($min);
+      }
+    }
+    if ($max) $max.value = Number(max_qty ?? 1);
+
+    return { uid, cardEl };
   }
 
+ /**
+  * [INFO] Esta função já estava correta, usando createComplementHTML.
+  * Cria uma linha de item na UI, preenchendo os dados.
+  * Utiliza a função global 'createComplementHTML' para o layout.
+  */
   function renderModifierRow(cardEl, item) {
+    const list = cardEl.querySelector('.complement-list');
+    if (!list) return;
+
     const uid = `comp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-    const list = cardEl.querySelector('.complement-list'); if (!list) return;
-    list.insertAdjacentHTML('beforeend', `
-      <div class="p-3 bg-surface-2 rounded-lg border border-border">
-        <div class="grid grid-cols-[5fr_3fr_1fr] items-center gap-4">
-          <div class="col-span-5">
-            <input id="comp-name-${uid}" type="text" placeholder="Nome do Complemento"
-              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"
-              value="${item?.name||''}"/>
-          </div>
-          <div class="col-span-3">
-            <div class="relative">
-              <span class="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary text-sm">R$</span>
-              <input id="comp-price-${uid}" type="text" placeholder="0,00" value="${centsToMask(item?.unit_price||0)}"
-                class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 text-text-primary text-sm"/>
-            </div>
-          </div>
-          <div class="col-span-1 flex justify-end">
-            <button class="text-danger hover:text-danger-hover transition p-1 delete-complement-btn">
-              <span class="material-icons-outlined">delete</span>
-            </button>
-          </div>
-        </div>
-        <div class="mt-2">
-          <textarea id="comp-desc-${uid}" rows="1" placeholder="Descrição (opcional)"
-            class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm resize-none">${item?.description||''}</textarea>
-        </div>
-      </div>
-    `);
+
+    // 1. Chama a função externa para criar o HTML base
+    if (typeof createComplementHTML !== 'function') {
+      console.error('[Editor] renderModifierRow: createComplementHTML() não foi encontrada. Verifique se o script está na página.');
+      return;
+    }
+    const html = createComplementHTML(uid);
+    list.insertAdjacentHTML('beforeend', html);
+
+    const rowEl = list.lastElementChild;
+    if (!rowEl) return;
+    
+    // 2. Preenche os valores
+    const $name = rowEl.querySelector(`#comp-name-${uid}`);
+    const $price = rowEl.querySelector(`#comp-price-${uid}`);
+    const $desc = rowEl.querySelector(`#comp-desc-${uid}`);
+
+    if ($name) $name.value = item?.name || '';
+    // Usa o helper 'centsToMask' que já está neste script
+    if ($price) $price.value = centsToMask(item?.unit_price || 0); 
+    if ($desc) $desc.value = item?.description || '';
   }
 
-  // === Carregar grupos+itens na EDIÇÃO ===
+  /**
+   * [INFO] Esta função já estava correta, com os fallbacks.
+   * Carrega grupos e itens do Supabase, com fallbacks.
+   */
   async function loadGroupsForProduct() {
-    if (!PRODUCT_ID || !RESTAURANT_ID) return;
-    const box = document.getElementById('category-list-container'); if (box) box.innerHTML = '';
+    // 1. Guardas (Usa o PRODUCT_ID unificado deste escopo)
+    if (!PRODUCT_ID) {
+      console.warn('[Editor] loadGroupsForProduct: PRODUCT_ID está vazio. Saindo.');
+      return;
+    }
+    // (Usa o RESTAURANT_ID unificado deste escopo)
+    
+    const box = document.getElementById('category-list-container');
+    if (box) box.innerHTML = ''; // Limpa container
 
-    const { data: links, error } = await db
-      .from(TABLE_TREE)
-      .select(`
-        group_id, min_qty, max_qty, is_required, sort_order,
-        modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
-      `)
-      .eq(TREE_COLS.restaurant, RESTAURANT_ID)
-      .eq(TREE_COLS.product, PRODUCT_ID)
-      .order(TREE_COLS.sort, { ascending: true });
+    try {
+      // --- FLUXO 1: Tentar via product_groups (Vínculos) ---
+      let linksQuery = db
+        .from(TABLE_TREE)
+        .select(`
+          group_id, min_qty, max_qty, is_required, sort_order,
+          modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
+        `)
+        .eq(TREE_COLS.product, PRODUCT_ID)
+        .order(TREE_COLS.sort, { ascending: true });
 
-    if (error) { console.error(error); return; }
+      // Adiciona filtro de restaurant_id SE ele existir
+      if (RESTAURANT_ID) {
+        linksQuery = linksQuery.eq(TREE_COLS.restaurant, RESTAURANT_ID);
+      }
 
-    for (const l of (links||[])) {
-      const groupTitle = l.modifier_groups?.title ?? l.modifier_groups?.name ?? '(sem nome)';
-      const { cardEl } = renderGroupCard({
-  name: l.modifier_groups?.title ?? l.modifier_groups?.name ?? '(sem nome)',
-  min_qty: l.min_qty,
-  max_qty: l.max_qty,
-  groupId: l.group_id
-});
+      let { data: links, error } = await linksQuery;
 
-      const { data: items } = await db
-        .from(TABLE_ITEMS)
-        .select('id,name,unit_price,description,max_per_item,sort_order')
-        .eq('group_id', l.group_id)
-        .order('sort_order', { ascending: true, nullsLast: true });
+      // Fallback 1.1 (se não veio nada, tenta SÓ com product_id, sem restaurant_id)
+      if (RESTAURANT_ID && (!links || links.length === 0)) {
+        console.log('[Editor] loadGroupsForProduct: product_groups vazio. Tentando fallback sem restaurant_id...');
+        let { data: fallbackLinks, error: fallbackError } = await db
+          .from(TABLE_TREE)
+          .select(`
+            group_id, min_qty, max_qty, is_required, sort_order,
+            modifier_groups:${TABLE_GROUPS}( id, title, name, sort_order )
+          `)
+          .eq(TREE_COLS.product, PRODUCT_ID)
+          //.is(TREE_COLS.restaurant, null) // Alternativa: buscar só os antigos
+          .order(TREE_COLS.sort, { ascending: true });
+        
+        links = fallbackLinks; // Usa os links do fallback
+        error = fallbackError;
+      }
 
-      (items||[]).forEach(it => renderModifierRow(cardEl, it));
+      if (error) { throw new Error(`Erro ao buscar product_groups: ${error.message}`); }
+
+      // SE ENCONTROU VÍNCULOS, processa e sai
+      if (links && links.length > 0) {
+        console.log(`[Editor] Carregando ${links.length} grupos via product_groups (Vínculos)`);
+        for (const l of links) {
+          if (!l.modifier_groups) {
+             console.warn(`[Editor] Vínculo encontrado (group_id ${l.group_id}) mas o grupo não existe em modifier_groups. Pulando.`);
+             continue;
+          }
+          const groupTitle = l.modifier_groups.title ?? l.modifier_groups.name ?? '(sem nome)';
+          const { cardEl } = renderGroupCard({
+            name: groupTitle,
+            min_qty: l.min_qty,
+            max_qty: l.max_qty,
+            groupId: l.group_id
+          });
+
+          if (!cardEl) continue;
+
+          const { data: items } = await db
+            .from(TABLE_ITEMS)
+            .select('id,name,unit_price,description,max_per_item,sort_order')
+            .eq('group_id', l.group_id)
+            .order('sort_order', { ascending: true, nullsLast: true });
+
+          (items || []).forEach(it => renderModifierRow(cardEl, it));
+        }
+        return; // Fim do Fluxo 1
+      }
+
+      // --- FLUXO 2: Fallback via modifier_groups (direto) ---
+      // (Só chega aqui se 'links' estiver vazio)
+      console.warn(`[Editor] Fallback: carregando grupos direto de modifier_groups (product_id: ${PRODUCT_ID})`);
+
+      let groupsQuery = db
+        .from(TABLE_GROUPS)
+        .select('id, title, name, sort_order')
+        .eq('product_id', PRODUCT_ID)
+        .order('sort_order', { ascending: true });
+
+      if (RESTAURANT_ID) {
+        groupsQuery = groupsQuery.eq('restaurant_id', RESTAURANT_ID);
+      }
+      
+      let { data: groups, error: groupsError } = await groupsQuery;
+
+      // Fallback 2.1 (se não veio nada, tenta SÓ com product_id)
+      if (RESTAURANT_ID && (!groups || groups.length === 0)) {
+         console.log('[Editor] loadGroupsForProduct: modifier_groups vazio. Tentando fallback sem restaurant_id...');
+         let { data: fallbackGroups, error: fallbackGroupsError } = await db
+          .from(TABLE_GROUPS)
+          .select('id, title, name, sort_order')
+          .eq('product_id', PRODUCT_ID)
+          .order('sort_order', { ascending: true });
+        
+        groups = fallbackGroups;
+        groupsError = fallbackGroupsError;
+      }
+
+      if (groupsError) { throw new Error(`Erro no fallback de modifier_groups: ${groupsError.message}`); }
+
+      if (groups && groups.length > 0) {
+        console.log(`[Editor] Fallback: Carregando ${groups.length} grupos...`);
+        for (const g of groups) {
+          const { cardEl } = renderGroupCard({
+            name: g.title ?? g.name,
+            min_qty: 0, // Default
+            max_qty: 1, // Default
+            groupId: g.id
+          });
+
+          if (!cardEl) continue;
+
+          const { data: items } = await db
+            .from(TABLE_ITEMS)
+            .select('id,name,unit_price,description,max_per_item,sort_order')
+            .eq('group_id', g.id)
+            .order('sort_order', { ascending: true, nullsLast: true });
+
+          (items || []).forEach(it => renderModifierRow(cardEl, it));
+        }
+      }
+    } catch (err) {
+      console.error('[Editor] Falha total ao carregar complementos:', err);
     }
   }
+
+/**
+ * [INFO] Esta função não foi alterada, pois já estava correta.
+ * Converte o estado da UI de Complementos para o payload JSON 
+ * esperado pelo RPC 'save_product_modifiers_tree'.
+ */
+function buildModifiersPayloadFromUI() {
+  console.log("[Editor] Construindo payload de complementos a partir da UI para RPC...");
+  const payload = [];
+  
+  // Helper para escapar IDs (copiado de saveGroupsForProduct)
+  const escapeId = (value) => {
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+      return CSS.escape(value);
+    }
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
+  };
+
+  // Seleciona todos os cards de categoria (grupos)
+  const groupCards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
+  console.log(`[Editor] [RPC] Encontrados ${groupCards.length} cards de categoria.`);
+
+  for (const cardEl of groupCards) {
+    const uid = cardEl.getAttribute('data-uid') || '';
+    if (!uid) {
+        console.warn("[Editor] [RPC] Pulando card de grupo sem data-uid.");
+        continue;
+    }
+    const safeUid = escapeId(uid);
+    
+    // 1. Pega dados do Grupo (Categoria)
+    const $title = cardEl.querySelector(`#category-name-${safeUid}`);
+    const $min = cardEl.querySelector(`#category-min-${safeUid}`);
+    const $max = cardEl.querySelector(`#category-max-${safeUid}`);
+
+    const group_title = ($title?.value || '').trim();
+    let min_qty = parseInt(($min?.value || '0'), 10) || 0;
+    let max_qty = parseInt(($max?.value || '0'), 10) || 0;
+
+    if (min_qty < 0) min_qty = 0;
+    if (max_qty < 0) max_qty = 0;
+
+    // Validação: Não envia grupos sem nome
+    if (!group_title) {
+        console.warn("[Editor] [RPC] Pulando categoria sem nome.");
+        continue;
+    }
+    
+    // Validação: Garante que max_qty não seja menor que min_qty (se max_qty > 0)
+    if (max_qty > 0 && max_qty < min_qty) {
+         console.warn(`[Editor] [RPC] Corrigindo Qtd. Máxima na categoria "${group_title}". Era ${max_qty}, virou ${min_qty}.`);
+         max_qty = min_qty;
+    }
+
+    const groupPayload = {
+      group_title,
+      min_qty,
+      max_qty,
+      items: [] // Array para os itens (modifiers)
+    };
+
+    // 2. Pega dados dos Itens (Modifiers)
+    const itemRows = Array.from(cardEl.querySelectorAll('.complement-list > div.p-3.bg-surface-2'));
+    
+    for (const rowEl of itemRows) {
+      const $name = rowEl.querySelector('input[id^="comp-name-"]');
+      const $price = rowEl.querySelector('input[id^="comp-price-"]');
+      const $desc = rowEl.querySelector('textarea[id^="comp-desc-"]');
+
+      const name = ($name?.value || '').trim();
+      
+      // Validação: Não envia itens sem nome
+      if (!name) {
+          console.warn("[Editor] [RPC] Pulando item sem nome.");
+          continue;
+      }
+
+      groupPayload.items.push({
+        name: name,
+        price: maskToNumber($price?.value || '0'), // Usa helper global
+        description: ($desc?.value || '').trim() || null
+      });
+    }
+    
+    // Adiciona o grupo processado ao payload final
+    payload.push(groupPayload);
+  }
+  
+  console.log("[Editor] [RPC] Payload de complementos construído:", payload);
+  return payload;
+}
+
+
 // expõe para o resto da página
 window.__COMPL = {
   loadGroupsForProduct,
@@ -1625,7 +1716,9 @@ window.__COMPL = {
 
   // === Salvar categorias (grupos) do produto ===
   async function saveGroupsForProduct(forceProductId) {
+    // Usa o 'let PRODUCT_ID' do escopo unificado
     const productId = forceProductId || PRODUCT_ID || window.__EDITOR_CTX__?.PRODUCT_ID || '';
+    // Usa o 'const RESTAURANT_ID' do escopo unificado
     const restaurantId = RESTAURANT_ID || window.__EDITOR_CTX__?.RESTAURANT_ID || '';
 
     if (!restaurantId || !productId) {
@@ -1774,7 +1867,7 @@ window.__COMPL = {
       if (!name) return;
 
       payload.push({
-        restaurant_id : RESTAURANT_ID || null,
+        restaurant_id : RESTAURANT_ID || null, // Usa o ID unificado
         group_id      : groupId,
         name,
         unit_price    : maskToNumber($price?.value || '0'),
@@ -1798,18 +1891,45 @@ window.__COMPL = {
     if (btn) { btn.__saving = true; btn.disabled = true; btn.textContent = 'Salvando...'; }
 
     try {
-      // cria produto se for novo (mandando SLUG)
-      if (!PRODUCT_ID && window.__EDITOR_CTX__?.PRODUCT_ID) {
-        PRODUCT_ID = window.__EDITOR_CTX__.PRODUCT_ID;
+      // 1. Coleta dados do formulário
+      const name = (document.getElementById('product-name')?.value || '').trim();
+      const desc = (document.getElementById('product-description')?.value || '').trim();
+      // Usa o helper de máscara de preço que já existe
+      const price = (window.getPriceDecimal ? window.getPriceDecimal() : 0) || 0;
+      const catId = document.getElementById('product-category')?.value || CATEGORY_ID || null; // Usa CATEGORY_ID unificado
+      // Pega o status do botão 'Pausar' (definido pelo outro script)
+      const isActive = (typeof window.__productActive === 'boolean') ? window.__productActive : true; 
+
+      // Validação
+      if (!name || !catId) {
+        document.getElementById('cat-error')?.classList.remove('hidden');
+        throw new Error('Preencha nome e categoria.');
+      } else {
+        document.getElementById('cat-error')?.classList.add('hidden');
       }
 
-      if (!PRODUCT_ID) {
-        const name  = (document.getElementById('product-name')?.value || '').trim();
-        const desc  = (document.getElementById('product-description')?.value || '').trim();
-        const price = (window.getPriceDecimal ? window.getPriceDecimal() : 0) || 0;
-        const catId = document.getElementById('product-category')?.value || CATEGORY_ID || null;
-        if (!name || !catId) throw new Error('Preencha nome e categoria.');
+      // 2. Decide: Criar (INSERT) ou Editar (UPDATE)
+      //    Usa a variável `PRODUCT_ID` (let) do escopo deste script
+      let currentProductId = PRODUCT_ID; 
 
+      if (currentProductId) {
+        // ----- MODO EDIÇÃO (UPDATE) -----
+        const { error: updateError } = await db
+          .from(TABLE_PRODUCTS)
+          .update({
+            name: name,
+            description: desc || null,
+            base_price: price,
+            category_id: catId,
+            // Nota: O status (is_active) é controlado pelo script PAUSE_TOGGLE_HANDLER
+          })
+          .eq('id', currentProductId)
+          .eq('restaurant_id', RESTAURANT_ID); // Usa RESTAURANT_ID unificado
+
+        if (updateError) throw updateError;
+
+      } else {
+        // ----- MODO CRIAÇÃO (INSERT) -----
         const makeSlug = (t) => {
           const base = (window.slugify ? window.slugify(t) :
             String(t||'').toLowerCase()
@@ -1822,52 +1942,98 @@ window.__COMPL = {
         let slug = makeSlug(name);
 
         let insP = await db.from(TABLE_PRODUCTS).insert({
-          restaurant_id: RESTAURANT_ID,
+          restaurant_id: RESTAURANT_ID, // Usa RESTAURANT_ID unificado
           category_id  : catId,
           name, slug,
           description  : desc || null,
           base_price   : price,
-          is_active    : true
+          is_active    : isActive // Salva o status atual
         }).select('id').single();
 
+        // Fallback de slug (se o primeiro falhar por 'unique')
         if (insP.error && insP.error.code === '23505') {
           slug = `${slug}-${Math.random().toString(36).slice(2,6)}`;
           insP = await db.from(TABLE_PRODUCTS).insert({
-            restaurant_id: RESTAURANT_ID,
+            restaurant_id: RESTAURANT_ID, // Usa RESTAURANT_ID unificado
             category_id  : catId,
             name, slug,
             description  : desc || null,
             base_price   : price,
-            is_active    : true
+            is_active    : isActive
           }).select('id').single();
         }
 
         if (insP.error) throw insP.error;
-        PRODUCT_ID = insP.data.id;
+
+        // Guarda o ID recém-criado para o resto da execução
+        currentProductId = insP.data.id;
+        PRODUCT_ID = currentProductId; // Atualiza a variável 'let' do escopo
         if (window.__EDITOR_CTX__) {
-          window.__EDITOR_CTX__.PRODUCT_ID = PRODUCT_ID;
+          window.__EDITOR_CTX__.PRODUCT_ID = currentProductId;
         }
       }
 
-      if (!PRODUCT_ID) throw new Error('Falha ao criar o produto antes de salvar os complementos.');
+      // 3. Salva Complementos (Grupos e Itens)
+      //    Neste ponto, `currentProductId` está *garantido*
 
-      // salva categorias e itens
-      const currentProductId = PRODUCT_ID || window.__EDITOR_CTX__?.PRODUCT_ID || '';
       if (!currentProductId) {
-        throw new Error('Sem PRODUCT_ID para salvar grupos.');
+        throw new Error('Falha ao obter ID do produto antes de salvar complementos.');
       }
 
+      // `saveGroupsForProduct` agora recebe o ID garantido
       const groups = await saveGroupsForProduct(currentProductId);
-      for (const g of groups) await saveModifiersForGroup(g.groupId, g.cardEl);
+      
+      // Salva os itens (modifiers) para cada grupo
+      for (const g of groups) {
+        await saveModifiersForGroup(g.groupId, g.cardEl);
+      }
 
-      alert('Produto salvo com complementos.');
+      // [INÍCIO DA NOVA ETAPA (RPC) - ADICIONADA CONFORME SOLICITADO]
+      // 3.1. Constrói o payload a partir da UI
+      const p_groups_payload = buildModifiersPayloadFromUI(); // Chama a nova função helper
+      const p_restaurant_id = RESTAURANT_ID; // Usa RESTAURANT_ID unificado
+      const p_product_id = currentProductId;
+      
+      console.log("[Editor] [NOVA ETAPA] Chamando RPC 'save_product_modifiers_tree' com:", { p_restaurant_id, p_product_id, p_groups_payload });
+
+      // 3.2. Chama o RPC
+      const { data: rpcData, error: rpcError } = await db.rpc('save_product_modifiers_tree', {
+        p_restaurant_id: p_restaurant_id,
+        p_product_id: p_product_id,
+        p_groups_payload: p_groups_payload
+      });
+
+      // 3.3. Trata erro do RPC (conforme solicitado)
+      if (rpcError) {
+        console.error('[Editor] Erro no RPC save_product_modifiers_tree:', rpcError);
+        // Lança o erro para ser pego pelo catch principal
+        throw new Error(`Produto salvo (lógica antiga OK), mas falha ao sincronizar complementos (RPC): ${rpcError.message}`);
+      }
+      
+      console.log("[Editor] [NOVA ETAPA] RPC 'save_product_modifiers_tree' executado com sucesso:", rpcData);
+      // [FIM DA NOVA ETAPA (RPC)]
+
+
+      alert('Produto salvo com sucesso.'); // (Mensagem genérica)
+
+      // [NOVA AÇÃO] Redireciona para o portal-cardapio após o sucesso
+      setTimeout(() => {
+        let redirectUrl = '/portal-cardapio/'; // URL ajustada conforme solicitado
+        // A variável RESTAURANT_ID já está disponível neste escopo
+        if (RESTAURANT_ID) {
+          redirectUrl += `?restaurant_id=${encodeURIComponent(RESTAURANT_ID)}`;
+        }
+        window.location.href = redirectUrl;
+      }, 100); // Delay de 100ms para garantir que o alert feche antes do redirecionamento
+
     } catch (err) {
       console.error('[Editor] Erro ao salvar:', err);
-      alert(err?.message || 'Falha ao salvar complementos.');
+      alert(err?.message || 'Falha ao salvar. Verifique o console.');
     } finally {
       if (btn) { btn.__saving = false; btn.disabled = false; btn.textContent = 'Salvar'; }
     }
   }
+  // [FIM DA CORREÇÃO]
 
   // === Boot ===
   document.addEventListener('DOMContentLoaded', () => {
@@ -1876,7 +2042,7 @@ window.__COMPL = {
       btn.addEventListener('click', (ev) => { handleSaveClick(ev); }); // mantém async/await funcionando
       btn.__bindSave = true;
     }
-    if (PRODUCT_ID) loadGroupsForProduct();
+    // if (PRODUCT_ID) loadGroupsForProduct(); // <-- Esta chamada duplicada foi removida.
   });
 })();
 </script>
