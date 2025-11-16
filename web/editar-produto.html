@@ -690,7 +690,7 @@ function renderGroupCard({ name, min_qty, max_qty, groupId = null }) {
 }
 
 
-function renderModifierRow(cardEl, { name, unit_price, description, max_per_item, sort_order }) {
+function renderModifierRow(cardEl, { name, unit_price, description, sort_order }) {
   const uniqueId = `comp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
   const list = cardEl.querySelector('.complement-list');
   if (!list) return;
@@ -700,7 +700,6 @@ function renderModifierRow(cardEl, { name, unit_price, description, max_per_item
   const row = list.lastElementChild;
   row.querySelector(`#comp-name-${uniqueId}`).value  = name || '';
   row.querySelector(`#comp-price-${uniqueId}`).value = toBRLStringFromNumber(unit_price || 0);
-  row.querySelector(`#comp-qty-${uniqueId}`).value   = Number(max_per_item || 0);
   row.querySelector(`#comp-desc-${uniqueId}`).value  = description || '';
 }
 
@@ -828,8 +827,8 @@ function createCategoryHTML(uniqueId) {
           function createComplementHTML(uniqueId) {
             return `
               <div class="p-3 bg-surface-2 rounded-lg border border-border">
-                <!-- Linha 1: Nome, Preço, Qtd. Máx, Ações -->
-                <div class="grid grid-cols-[5fr_3fr_3fr_1fr] items-center gap-4">
+                <!-- Linha 1: Nome, Preço e Ações -->
+                <div class="grid grid-cols-[5fr_3fr_1fr] items-center gap-4">
                   <!-- Nome (Input) -->
                   <div class="col-span-5">
                     <label class="sr-only" for="comp-name-${uniqueId}">Nome</label>
@@ -845,12 +844,6 @@ function createCategoryHTML(uniqueId) {
                         class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"
                         oninput="formatCurrencyInput(this)" onblur="formatCurrencyBlur(this)"/>
                     </div>
-                  </div>
-                  <!-- Qtd. Máx (Input) -->
-                  <div class="col-span-3">
-                    <label class="sr-only" for="comp-qty-${uniqueId}">Qtd. Máx</label>
-                    <input id="comp-qty-${uniqueId}" type="number" placeholder="Qtd. Máx" value="1" min="0"
-                      class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition text-text-primary text-sm"/>
                   </div>
                   <!-- Ações (Deletar) -->
                   <div class="col-span-1 flex justify-end">
@@ -1493,10 +1486,11 @@ await (window.__COMPL?.loadGroupsForProduct?.());
   // === Contexto (pega por querystring e/ou path) ===
   function getFromPath(regex){ const m = location.pathname.match(regex); return m ? m[1] : ''; }
   const qs = new URLSearchParams(location.search);
-  const RESTAURANT_ID = (window.RESTAURANT_ID || qs.get('restaurant_id') || '').trim()
+  const ctx = window.__EDITOR_CTX__ || {};
+  const RESTAURANT_ID = (window.RESTAURANT_ID || qs.get('restaurant_id') || ctx.RESTAURANT_ID || '').trim()
                       || sessionStorage.getItem('RESTAURANT_ID') || getFromPath(/\/restaurante\/([^\/?#]+)/i) || '';
-  let   PRODUCT_ID    = qs.get('product_id') || getFromPath(/editar-produto\/([^\/?#]+)/i) || '';
-  const CATEGORY_ID   = qs.get('category_id') || '';
+  let   PRODUCT_ID    = qs.get('product_id') || getFromPath(/editar-produto\/([^\/?#]+)/i) || ctx.PRODUCT_ID || '';
+  const CATEGORY_ID   = qs.get('category_id') || ctx.CATEGORY_ID || '';
 
   // === Tabelas (seu schema) ===
   const TABLE_PRODUCTS = 'products';
@@ -1560,7 +1554,7 @@ await (window.__COMPL?.loadGroupsForProduct?.());
     const list = cardEl.querySelector('.complement-list'); if (!list) return;
     list.insertAdjacentHTML('beforeend', `
       <div class="p-3 bg-surface-2 rounded-lg border border-border">
-        <div class="grid grid-cols-[5fr_3fr_3fr_1fr] items-center gap-4">
+        <div class="grid grid-cols-[5fr_3fr_1fr] items-center gap-4">
           <div class="col-span-5">
             <input id="comp-name-${uid}" type="text" placeholder="Nome do Complemento"
               class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"
@@ -1572,10 +1566,6 @@ await (window.__COMPL?.loadGroupsForProduct?.());
               <input id="comp-price-${uid}" type="text" placeholder="0,00" value="${centsToMask(item?.unit_price||0)}"
                 class="w-full bg-surface-1 border border-border rounded-md py-1.5 pl-7 pr-2 text-text-primary text-sm"/>
             </div>
-          </div>
-          <div class="col-span-3">
-            <input id="comp-qty-${uid}" type="number" min="0" value="${Number(item?.max_per_item||0)}"
-              class="w-full bg-surface-1 border border-border rounded-md py-1.5 px-3 text-text-primary text-sm"/>
           </div>
           <div class="col-span-1 flex justify-end">
             <button class="text-danger hover:text-danger-hover transition p-1 delete-complement-btn">
@@ -1634,8 +1624,11 @@ window.__COMPL = {
 };
 
   // === Salvar categorias (grupos) do produto ===
-  async function saveGroupsForProduct() {
-    if (!RESTAURANT_ID || !PRODUCT_ID) {
+  async function saveGroupsForProduct(forceProductId) {
+    const productId = forceProductId || PRODUCT_ID || window.__EDITOR_CTX__?.PRODUCT_ID || '';
+    const restaurantId = RESTAURANT_ID || window.__EDITOR_CTX__?.RESTAURANT_ID || '';
+
+    if (!restaurantId || !productId) {
       throw new Error('Sem PRODUCT_ID para salvar grupos.');
     }
 
@@ -1646,20 +1639,15 @@ window.__COMPL = {
       return String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
     };
 
-    const { error: delError } = await db
-      .from(TABLE_TREE)
-      .delete()
-      .eq(TREE_COLS.product, PRODUCT_ID)
-      .eq(TREE_COLS.restaurant, RESTAURANT_ID);
-    if (delError) throw delError;
+    const { data: existingGroups, error: existingErr } = await db
+      .from(TABLE_GROUPS)
+      .select('id')
+      .eq('product_id', productId);
+    if (existingErr) throw existingErr;
+    const existingIds = (existingGroups || []).map(g => g.id).filter(Boolean);
 
     const cards = Array.from(document.querySelectorAll('#category-list-container .bg-surface-1[data-uid]'));
-    const upsertPayload = [];
-    const out = [];
-    const seenLinks = new Set();
-
-    for (let i = 0; i < cards.length; i++) {
-      const cardEl = cards[i];
+    const parsedCards = cards.map((cardEl) => {
       const uid = cardEl.getAttribute('data-uid') || '';
       const safeUid = escapeId(uid);
       const $t = cardEl.querySelector(`#category-name-${safeUid}`);
@@ -1673,55 +1661,87 @@ window.__COMPL = {
       if (!title) throw new Error('Informe o nome da categoria.');
       if (max < min) throw new Error('Na categoria, Máxima deve ser ≥ Mínima.');
 
-      let groupId = cardEl.getAttribute('data-group-id');
+      return {
+        cardEl,
+        title,
+        min,
+        max,
+        groupId: cardEl.getAttribute('data-group-id') || ''
+      };
+    });
 
-      if (!groupId) {
+    const { error: delLinksError } = await db
+      .from(TABLE_TREE)
+      .delete()
+      .eq(TREE_COLS.product, productId)
+      .eq(TREE_COLS.restaurant, restaurantId);
+    if (delLinksError) throw delLinksError;
+
+    const keepIds = new Set();
+    const upsertPayload = [];
+    const out = [];
+
+    for (let i = 0; i < parsedCards.length; i++) {
+      const cardData = parsedCards[i];
+      let groupId = cardData.groupId;
+
+      if (groupId) {
+        keepIds.add(groupId);
+        const { error: updError } = await db
+          .from(TABLE_GROUPS)
+          .update({
+            title: cardData.title,
+            name: cardData.title,
+            sort_order: i + 1,
+          })
+          .eq('id', groupId)
+          .eq('product_id', productId);
+        if (updError) throw updError;
+      } else {
         const ins = await db
           .from(TABLE_GROUPS)
           .insert({
-            restaurant_id: RESTAURANT_ID,
-            product_id: PRODUCT_ID,
-            title,
-            name: title,
+            restaurant_id: restaurantId,
+            product_id: productId,
+            title: cardData.title,
+            name: cardData.title,
             sort_order: i + 1,
           })
           .select('id')
           .single();
         if (ins.error) throw ins.error;
         groupId = ins.data.id;
-        cardEl.setAttribute('data-group-id', groupId);
+        cardData.cardEl.setAttribute('data-group-id', groupId);
+        cardData.groupId = groupId;
+        keepIds.add(groupId);
       }
 
-      if (seenLinks.has(groupId)) {
-        const uniqueTitle = `${title} ${Math.random().toString(36).slice(2, 5)}`;
-        const insDup = await db
-          .from(TABLE_GROUPS)
-          .insert({
-            restaurant_id: RESTAURANT_ID,
-            product_id: PRODUCT_ID,
-            title: uniqueTitle,
-            name: uniqueTitle,
-            sort_order: i + 1,
-          })
-          .select('id')
-          .single();
-        if (insDup.error) throw insDup.error;
-        groupId = insDup.data.id;
-        cardEl.setAttribute('data-group-id', groupId);
-      }
-
-      seenLinks.add(groupId);
       upsertPayload.push({
-        restaurant_id: RESTAURANT_ID,
-        product_id: PRODUCT_ID,
+        restaurant_id: restaurantId,
+        product_id: productId,
         group_id: groupId,
-        min_qty: min,
-        max_qty: max,
-        is_required: min >= 1,
+        min_qty: cardData.min,
+        max_qty: cardData.max,
+        is_required: cardData.min >= 1,
         sort_order: i + 1,
       });
 
-      out.push({ groupId, cardEl });
+      out.push({ groupId, cardEl: cardData.cardEl });
+    }
+
+    const toDelete = existingIds.filter(id => !keepIds.has(id));
+    if (toDelete.length) {
+      const { error: delItemsErr } = await db
+        .from(TABLE_ITEMS)
+        .delete()
+        .in('group_id', toDelete);
+      if (delItemsErr) throw delItemsErr;
+
+      const { error: delGroupsErr } = await db
+        .from(TABLE_GROUPS)
+        .delete()
+        .in('id', toDelete);
+      if (delGroupsErr) throw delGroupsErr;
     }
 
     if (upsertPayload.length) {
@@ -1749,7 +1769,6 @@ window.__COMPL = {
       const $name = rowEl.querySelector('input[id^="comp-name-"]');
       const $price= rowEl.querySelector('input[id^="comp-price-"]');
       const $desc = rowEl.querySelector('textarea[id^="comp-desc-"]');
-      const $qty  = rowEl.querySelector('input[id^="comp-qty-"]');
 
       const name = ($name?.value || '').trim();
       if (!name) return;
@@ -1760,7 +1779,7 @@ window.__COMPL = {
         name,
         unit_price    : maskToNumber($price?.value || '0'),
         description   : ($desc?.value || '').trim() || null,
-        max_per_item  : parseInt(($qty?.value || '0'),10) || 0,
+        max_per_item  : 0,
         sort_order    : idx + 1
       });
     });
@@ -1780,6 +1799,10 @@ window.__COMPL = {
 
     try {
       // cria produto se for novo (mandando SLUG)
+      if (!PRODUCT_ID && window.__EDITOR_CTX__?.PRODUCT_ID) {
+        PRODUCT_ID = window.__EDITOR_CTX__.PRODUCT_ID;
+      }
+
       if (!PRODUCT_ID) {
         const name  = (document.getElementById('product-name')?.value || '').trim();
         const desc  = (document.getElementById('product-description')?.value || '').trim();
@@ -1821,12 +1844,20 @@ window.__COMPL = {
 
         if (insP.error) throw insP.error;
         PRODUCT_ID = insP.data.id;
+        if (window.__EDITOR_CTX__) {
+          window.__EDITOR_CTX__.PRODUCT_ID = PRODUCT_ID;
+        }
       }
 
       if (!PRODUCT_ID) throw new Error('Falha ao criar o produto antes de salvar os complementos.');
 
       // salva categorias e itens
-      const groups = await saveGroupsForProduct();
+      const currentProductId = PRODUCT_ID || window.__EDITOR_CTX__?.PRODUCT_ID || '';
+      if (!currentProductId) {
+        throw new Error('Sem PRODUCT_ID para salvar grupos.');
+      }
+
+      const groups = await saveGroupsForProduct(currentProductId);
       for (const g of groups) await saveModifiersForGroup(g.groupId, g.cardEl);
 
       alert('Produto salvo com complementos.');
